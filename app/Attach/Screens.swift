@@ -499,12 +499,32 @@ struct TasksView: View {
 }
 
 struct ProfileView: View {
+    @EnvironmentObject private var models: ModelStore
+    @State private var showSetup = false
+
     var body: some View {
-        Screen(kicker: "Профиль", title: "Настройки") {
-            VStack(spacing: 8) {
-                Row(icon: "key", title: "Модель и ключи", subtitle: "deepseek-chat · Keychain")
-                Row(icon: "lock.shield", title: "Разрешения", subtitle: "Файлы, календарь, микрофон")
-                Row(icon: "shippingbox", title: "Версия", subtitle: "0.1 · сборка из GitHub Actions")
+        NavigationStack {
+            Screen(kicker: "Профиль", title: "Настройки") {
+                VStack(spacing: 8) {
+                    Button {
+                        showSetup = true
+                    } label: {
+                        Row(
+                            icon: "key",
+                            title: "Модель и ключ",
+                            subtitle: models.hasKey
+                                ? "\(models.provider.title) · \(models.model)"
+                                : "не подключено"
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Row(icon: "lock.shield", title: "Разрешения", subtitle: "Файлы, календарь, микрофон")
+                    Row(icon: "shippingbox", title: "Версия", subtitle: "0.1 · сборка из GitHub Actions")
+                }
+            }
+            .sheet(isPresented: $showSetup) {
+                ModelSetupView()
             }
         }
     }

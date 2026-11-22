@@ -5,7 +5,9 @@ enum Tab: Hashable {
 }
 
 struct RootView: View {
+    @EnvironmentObject private var models: ModelStore
     @State private var tab: Tab = .chats
+    @State private var showSetup = false
 
     var body: some View {
         TabView(selection: $tab) {
@@ -29,9 +31,19 @@ struct RootView: View {
                 .tabItem { Label("Профиль", systemImage: "person") }
                 .tag(Tab.profile)
         }
+        .onAppear {
+            if !models.hasKey {
+                showSetup = true
+            }
+        }
+        .fullScreenCover(isPresented: $showSetup) {
+            ModelSetupView(isOnboarding: true)
+        }
     }
 }
 
 #Preview {
     RootView()
+        .environmentObject(WorkspaceStore())
+        .environmentObject(ModelStore())
 }
