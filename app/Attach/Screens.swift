@@ -119,7 +119,7 @@ struct ChatsView: View {
                 TextField("Название", text: $draftName)
                 Button("Создать") {
                     withAnimation(.snappy(duration: 0.3)) {
-                        store.addProject(name: draftName)
+                        _ = store.addProject(name: draftName)
                     }
                 }
                 Button("Отмена", role: .cancel) {}
@@ -244,7 +244,7 @@ struct ProjectView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     withAnimation(.snappy(duration: 0.3)) {
-                        store.addChat(to: projectID)
+                        _ = store.addChat(to: projectID)
                     }
                 } label: {
                     Image(systemName: "square.and.pencil")
