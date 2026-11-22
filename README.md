@@ -4,64 +4,45 @@ iOS-приложение: агент, который живёт на телеф�
 чёрный/белый, нативный Liquid Glass, пять вкладок: Чаты (проекты), Мини-аппы,
 Агенты, Задачи, Профиль.
 
-Сейчас в репозитории каркас: пустые экраны + рабочая сборка `.ipa` через
+Сейчас в репозитории каркас: пять экранов-заглушек и рабочая сборка `.ipa` через
 GitHub Actions. Дальше наращиваем агент, файлы, инструменты.
 
-## Что нужно установить
+## Как это работает
 
-На Windows — **ничего**. Сборка идёт на macOS-раннере GitHub; локально уже есть
-`git`, `gh`, `node`, `python` — для Swift они не нужны.
+Xcode на компьютере не нужен и Apple Developer Program для сборки не нужен.
 
-| Где | Что | Зачем |
-| --- | --- | --- |
-| Apple | Developer Program (платный) | сертификаты и TestFlight |
-| GitHub | репозиторий + секреты | macOS-раннер и ключ |
-| iPhone | TestFlight | ставить сборки без провода |
+```
+push в main → GitHub Actions (macOS) → xcodegen → xcodebuild (без подписи)
+            → Pocket.ipa → артефакт для скачивания
+```
 
-Xcode, Python и прочее на компьютер ставить не надо. Python появится позже —
-внутри приложения, как встроенный рантайм, и это будет часть iOS-сборки, а не
-установка на телефон.
+Сборка **неподписанная**: её нельзя запустить сразу, зато её подписывает любой
+инструмент на телефоне или на ПК твоим сертификатом. Это и есть схема
+«скачал IPA — поставил».
 
-## Настройка Apple (один раз)
+## Установка на телефон
 
-1. **Team ID** — [developer.apple.com/account](https://developer.apple.com/account)
-   → Membership → *Team ID* (10 символов).
-2. **Ключ App Store Connect** —
-   [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → Users and Access
-   → Integrations → App Store Connect API → **+**:
-   - роль **App Manager** (или Admin);
-   - скачать `.p8` (файл даётся один раз), записать **Key ID** и **Issuer ID**.
-3. **Карточка приложения** — App Store Connect → My Apps → **+** → New App:
-   - платформа iOS, имя любое, например «Пульт»;
-   - Bundle ID: создать новый `com.manul.pocket` (или свой);
-   - SKU — любой, например `pocket001`.
+1. Actions → последняя сборка → **Artifacts** → `Pocket-ipa` → распаковать,
+   внутри `Pocket.ipa`.
+2. Подписать и установить одним из способов:
+   - **eSign / Feather / Esign+** — на телефоне, нужен `.p12` + `.mobileprovision`;
+   - **AltStore / SideStore** — на телефоне, нужен Apple ID;
+   - **Sideloadly** — на Windows, по кабелю, Apple ID или сертификат.
+3. Если инструмент просит bundle id — он должен совпадать с App ID в профиле.
+   По умолчанию в проекте `com.manul.pocket`; поменять можно секретом
+   `BUNDLE_ID` (Settings → Secrets → Actions) без правки кода.
 
-## Секреты GitHub
+Позже можно подписывать прямо в CI: положить `.p12` и `.mobileprovision` в
+секреты и отдавать готовый к установке IPA. Это имеет смысл, когда появятся
+расширения (виджеты, Live Activity) — им нужны entitlements из профиля.
 
-Settings → Secrets and variables → Actions → New repository secret:
+## Секреты
+
+Сейчас обязательных нет. Необязательный:
 
 | Имя | Значение |
 | --- | --- |
-| `APPLE_TEAM_ID` | Team ID из пункта 1 |
-| `ASC_KEY_ID` | Key ID |
-| `ASC_ISSUER_ID` | Issuer ID |
-| `ASC_KEY_P8` | содержимое `.p8` в base64 |
-| `BUNDLE_ID` | *(необязательно)* свой bundle id |
-
-Base64 из Windows:
-
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\путь\AuthKey_XXXX.p8"))
-```
-
-## Сборка
-
-```bash
-git push origin main
-```
-
-Actions → **iOS** → сборка (~5–10 мин) → артефакт `Pocket-ipa` + автоматическая
-отправка в TestFlight. На телефоне: TestFlight → установить.
+| `BUNDLE_ID` | свой bundle id, если отличается от `com.manul.pocket` |
 
 Публичный репозиторий — macOS-минуты бесплатны и без лимита. Приватный — 200
 минут в месяц (2000 обычных, macOS считается ×10), примерно 20–30 сборок.
@@ -73,13 +54,14 @@ app/
   project.yml          # проект собирается XcodeGen, .xcodeproj не храним
   Pocket/
     PocketApp.swift
-    RootView.swift     # TabView из пяти вкладок
+    RootView.swift     # TabView из пяти вкладок (на iOS 26 — нативное стекло)
     Screens.swift      # заглушки экранов
-design/prototype.html  # кликабельный макет (чёрный/белый, стекло)
+    Assets.xcassets    # иконка
+design/prototype.html  # кликабельный макет
 .github/workflows/ios.yml
 ```
 
-Локально проект можно посмотреть так (нужен Mac):
+Локально посмотреть проект можно только на Mac:
 
 ```bash
 brew install xcodegen && cd app && xcodegen generate && open Pocket.xcodeproj
