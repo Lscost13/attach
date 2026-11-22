@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 60
     env:
       BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.manul.attach' }}
 
@@ -29,6 +29,37 @@ jobs:
         run: |
           chmod +x scripts/fetch-node.sh
           ./scripts/fetch-node.sh
+
+      - name: Кэш ядра (npm)
+        uses: actions/cache@v4
+        with:
+          path: app/Engine/node_modules
+          key: dsh-0.2.2-rc.5-${{ hashFiles('app/Engine/package-lock.json') }}
+
+      - name: Установить ядро
+        working-directory: app/Engine
+        run: |
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+          du -sh node_modules
+
+      - name: Вычистить нативные бинарники
+        working-directory: app/Engine
+        run: |
+          find node_modules -type f \( -name '*.node' -o -name '*.dylib' -o -name '*.so' -o -name '*.so.*' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' \) -delete
+          find node_modules -type f \( -name '*.map' -o -name '*.d.ts' \) -delete
+          du -sh node_modules
+
+      - name: Проверить запуск ядра
+        working-directory: app
+        run: |
+          node Engine/main.js > /tmp/engine.log 2>&1 &
+          ok=0
+          for i in $(seq 1 90); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3080/ 2>/dev/null; then ok=1; echo "engine up after ${i}s"; break; fi
+            sleep 1
+          done
+          if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 80 /tmp/engine.log; exit 1; fi
+          tail -n 20 /tmp/engine.log
 
       - name: Выбрать Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -68,7 +99,7 @@ jobs:
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry Attach.ipa Payload
-          unzip -l Attach.ipa | head -n 30
+          du -h Attach.ipa
 
       - name: Артефакт
         uses: actions/upload-artifact@v4

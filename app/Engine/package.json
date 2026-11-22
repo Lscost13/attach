@@ -1,7 +1,10 @@
 {
-  "name": "attach-core",
+  "name": "attach-engine",
   "version": "0.1.0",
   "private": true,
   "type": "commonjs",
-  "main": "main.js"
+  "main": "main.js",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.2.2-rc.5"
+  }
 }

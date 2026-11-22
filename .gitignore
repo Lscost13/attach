@@ -10,3 +10,4 @@ app/ExportOptions.plist
 # Прототип
 design/.shots/
 vendor/
+app/Engine/node_modules/

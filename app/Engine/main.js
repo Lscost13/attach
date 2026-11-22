@@ -1,42 +1,29 @@
-// Ядро Attach. Запускается внутри Node 24 (nodejs-mobile) в песочнице приложения.
-// Пока умеет только жить и отвечать на /health — дальше здесь появится агент.
+// Точка входа ядра: поднимаем сам DeepSeek Harness внутри процесса Node.
+// Своего сервера здесь больше нет — DSH сам слушает 127.0.0.1:3080.
 
-const http = require('http');
-const os = require('os');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
-const port = Number(process.env.ATTACH_PORT || 8787);
 const engineDir = process.env.ATTACH_ENGINE || __dirname;
-const workDir = process.env.ATTACH_WORKDIR || os.homedir();
+const home = process.env.HOME || engineDir;
 
-function json(res, code, body) {
-  const data = JSON.stringify(body);
-  res.writeHead(code, {
-    'content-type': 'application/json; charset=utf-8',
-    'content-length': Buffer.byteLength(data),
-  });
-  res.end(data);
+async function main() {
+  const pkgPath = require.resolve('@deepseek-ai/dsh/package.json');
+  const pkg = require(pkgPath);
+  const root = path.dirname(pkgPath);
+  const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin && pkg.bin.dsh;
+  if (!bin) throw new Error('dsh: в пакете нет bin');
+
+  const binPath = path.join(root, bin);
+  process.env.DSH_HOME = process.env.DSH_HOME || path.join(home, '.dsh');
+
+  process.argv = [process.argv[0], binPath, 'web', '--no-open'];
+  console.log('[attach] booting dsh:', binPath, 'home:', process.env.DSH_HOME);
+
+  await import(pathToFileURL(binPath).href);
 }
 
-const server = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    return json(res, 200, {
-      ok: true,
-      node: process.version,
-      platform: process.platform,
-      arch: process.arch,
-      engine: engineDir,
-      workdir: workDir,
-      uptime: Math.round(process.uptime()),
-    });
-  }
-  json(res, 404, { error: 'not found' });
-});
-
-server.on('error', (err) => {
-  console.error('[attach] server error:', err && err.message);
-});
-
-server.listen(port, '127.0.0.1', () => {
-  console.log('[attach] core ready on 127.0.0.1:' + port + ' node ' + process.version);
+main().catch((err) => {
+  console.error('[attach] dsh failed:', (err && (err.stack || err.message)) || err);
+  process.exitCode = 1;
 });

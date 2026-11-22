@@ -8,7 +8,7 @@ final class CoreRuntime: ObservableObject {
     enum Phase: Equatable {
         case idle
         case starting
-        case ready(node: String)
+        case ready
         case failed(String)
 
         var isReady: Bool {
@@ -20,16 +20,16 @@ final class CoreRuntime: ObservableObject {
             switch self {
             case .idle: return "Ядро не запущено"
             case .starting: return "Ядро запускается…"
-            case .ready(let node): return "Ядро на связи · Node \(node)"
-            case .failed(let reason): return "Ядро не поднялось"
+            case .ready: return "Ядро на связи"
+            case .failed: return "Ядро не поднялось"
             }
         }
 
         var subtitle: String {
             switch self {
-            case .idle: return "Node 24 внутри приложения"
-            case .starting: return "поднимаем Node в песочнице"
-            case .ready: return "127.0.0.1:8787 · локально, без сервера"
+            case .idle: return "DeepSeek Harness внутри приложения"
+            case .starting: return "поднимаем DSH в песочнице"
+            case .ready: return "127.0.0.1:3080 · локально, без сервера"
             case .failed(let reason): return reason
             }
         }
@@ -39,7 +39,7 @@ final class CoreRuntime: ObservableObject {
 
     @Published private(set) var phase: Phase = .idle
 
-    private let port: Int = 8787
+    private let port: Int = 3080
     private var booted = false
     private var attempts = 0
 
@@ -87,19 +87,15 @@ final class CoreRuntime: ObservableObject {
             phase = .failed("ядро не ответило за 30 секунд")
             return
         }
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/health")!)
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/")!)
         request.timeoutInterval = 1.5
         request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            var node: String?
-            if let data,
-               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                node = object["node"] as? String
-            }
+        URLSession.shared.dataTask(with: request) { _, response, _ in
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             Task { @MainActor in
-                if let node {
-                    self.phase = .ready(node: node)
+                if (200..<400).contains(code) {
+                    self.phase = .ready
                 } else {
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     self.poll()

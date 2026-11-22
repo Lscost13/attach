@@ -515,7 +515,7 @@ struct ProfileView: View {
 
     private var coreSubtitle: String {
         switch core.phase {
-        case .ready(let node): return "Node \(node) · на связи"
+        case .ready: return "DSH · на связи"
         case .starting: return "запускается…"
         case .failed(let reason): return reason
         case .idle: return "не запущено"
