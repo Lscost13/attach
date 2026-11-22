@@ -11,22 +11,15 @@ enum Theme {
 // MARK: - Каркас экрана
 
 struct Screen<Content: View>: View {
-    let kicker: String
     let title: String
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Text(kicker.uppercased())
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.4)
-                    .foregroundStyle(.white.opacity(0.32))
-
                 Text(title)
                     .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(.top, 6)
 
                 content()
                     .padding(.top, 20)
@@ -85,15 +78,12 @@ struct Row: View {
 
 struct ChatsView: View {
     @EnvironmentObject private var store: WorkspaceStore
-    @StateObject private var core = CoreRuntime.shared
     @State private var isCreating = false
     @State private var draftName = ""
 
     var body: some View {
         NavigationStack {
-            Screen(kicker: "Чаты", title: "Проекты") {
-                CoreStatusRow(phase: core.phase)
-
+            Screen(title: "Проекты") {
                 if store.projects.isEmpty {
                     EmptyProjects()
                 } else {
@@ -138,7 +128,6 @@ struct ChatsView: View {
                 Text("Папка, в которой будут жить чаты и файлы.")
             }
         }
-        .task { core.bootIfNeeded() }
     }
 }
 
@@ -368,7 +357,6 @@ struct ChatView: View {
             composer
         }
         .background(Color.black)
-        .navigationTitle(chat?.title ?? "Чат")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -458,7 +446,7 @@ struct MessageBubble: View {
 
 struct AppsView: View {
     var body: some View {
-        Screen(kicker: "Мини-аппы", title: "Свои штуки") {
+        Screen(title: "Свои штуки") {
             VStack(spacing: 14) {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 28))
@@ -483,7 +471,7 @@ struct AppsView: View {
 
 struct AgentsView: View {
     var body: some View {
-        Screen(kicker: "Агенты", title: "Кто работает") {
+        Screen(title: "Кто работает") {
             VStack(spacing: 10) {
                 Row(icon: "sparkle", title: "Основной", subtitle: "Универсальный · deepseek-chat")
                 Row(icon: "chevron.left.forwardslash.chevron.right", title: "Кодер", subtitle: "Пишет и правит код")
@@ -495,7 +483,7 @@ struct AgentsView: View {
 
 struct TasksView: View {
     var body: some View {
-        Screen(kicker: "Панель", title: "Задачи") {
+        Screen(title: "Задачи") {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Text("В работе 0")
@@ -522,11 +510,21 @@ struct TasksView: View {
 
 struct ProfileView: View {
     @EnvironmentObject private var models: ModelStore
+    @StateObject private var core = CoreRuntime.shared
     @State private var showSetup = false
+
+    private var coreSubtitle: String {
+        switch core.phase {
+        case .ready(let node): return "Node \(node) · на связи"
+        case .starting: return "запускается…"
+        case .failed(let reason): return reason
+        case .idle: return "не запущено"
+        }
+    }
 
     var body: some View {
         NavigationStack {
-            Screen(kicker: "Профиль", title: "Настройки") {
+            Screen(title: "Настройки") {
                 VStack(spacing: 10) {
                     Button {
                         showSetup = true
@@ -541,6 +539,7 @@ struct ProfileView: View {
                     }
                     .buttonStyle(.plain)
 
+                    Row(icon: "square.stack.3d.up", title: "Ядро", subtitle: coreSubtitle)
                     Row(icon: "lock.shield", title: "Разрешения", subtitle: "Файлы, календарь, микрофон")
                     Row(icon: "shippingbox", title: "Версия", subtitle: "0.1 · сборка из GitHub Actions")
                 }

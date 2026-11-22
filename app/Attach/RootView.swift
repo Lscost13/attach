@@ -32,6 +32,7 @@ struct RootView: View {
                 .tag(Tab.profile)
         }
         .onAppear {
+            CoreRuntime.shared.bootIfNeeded()
             if !models.hasKey {
                 showSetup = true
             }

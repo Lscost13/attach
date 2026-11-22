@@ -64,11 +64,6 @@ struct ModelSetupView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ATTACH")
-                .font(.caption2.weight(.semibold))
-                .tracking(2)
-                .foregroundStyle(.white.opacity(0.32))
-
             Text("Подключи модель")
                 .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.white)
