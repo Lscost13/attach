@@ -114,25 +114,25 @@ struct CoreStatusRow: View {
     let phase: CoreRuntime.Phase
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Circle()
                 .fill(phase.isReady ? Color.white : Color.white.opacity(0.35))
-                .frame(width: 7, height: 7)
+                .frame(width: 8, height: 8)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(phase.title)
-                    .font(.system(size: 12.5, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(.white)
                 Text(phase.subtitle)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.5))
             }
 
             Spacer(minLength: 0)
         }
-        .padding(12)
-        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.1), lineWidth: 1))
-        .padding(.bottom, 8)
+        .padding(14)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1), lineWidth: 1))
+        .padding(.bottom, 10)
     }
 }

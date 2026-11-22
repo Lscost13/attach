@@ -1,5 +1,13 @@
 import SwiftUI
 
+// MARK: - Тема
+
+enum Theme {
+    static let hPad: CGFloat = 20
+    static let cardRadius: CGFloat = 22
+    static let iconSide: CGFloat = 42
+}
+
 // MARK: - Каркас экрана
 
 struct Screen<Content: View>: View {
@@ -11,22 +19,22 @@ struct Screen<Content: View>: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(kicker.uppercased())
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.6)
-                    .foregroundStyle(.white.opacity(0.26))
+                    .font(.caption2.weight(.semibold))
+                    .tracking(1.4)
+                    .foregroundStyle(.white.opacity(0.32))
 
                 Text(title)
-                    .font(.system(size: 27, weight: .semibold))
+                    .font(.largeTitle.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(.top, 8)
+                    .padding(.top, 6)
 
                 content()
-                    .padding(.top, 18)
+                    .padding(.top, 20)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 90)
+            .padding(.horizontal, Theme.hPad)
+            .padding(.top, 10)
+            .padding(.bottom, 100)
         }
         .scrollIndicators(.hidden)
         .background(Color.black)
@@ -40,33 +48,36 @@ struct Row: View {
     var trailing: String? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .frame(width: Theme.iconSide, height: Theme.iconSide)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(.white)
                 Text(subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
             }
 
             Spacer(minLength: 8)
 
             if let trailing {
                 Text(trailing)
-                    .font(.system(size: 10.5, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.26))
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.white.opacity(0.3))
             }
         }
-        .padding(13)
-        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1), lineWidth: 1))
+        .padding(16)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
@@ -86,7 +97,7 @@ struct ChatsView: View {
                 if store.projects.isEmpty {
                     EmptyProjects()
                 } else {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 10) {
                         ForEach(store.projects) { project in
                             NavigationLink(value: project.id) {
                                 ProjectCard(project: project)
@@ -103,14 +114,14 @@ struct ChatsView: View {
                     isCreating = true
                 } label: {
                     Label("Новый проект", systemImage: "plus")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.headline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
+                        .padding(.vertical, 17)
                 }
                 .buttonStyle(.plain)
-                .glassSurface(cornerRadius: 18)
-                .padding(.top, 10)
+                .glassSurface(cornerRadius: 20)
+                .padding(.top, 12)
             }
             .navigationDestination(for: UUID.self) { id in
                 ProjectView(projectID: id)
@@ -133,24 +144,24 @@ struct ChatsView: View {
 
 struct EmptyProjects: View {
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Image(systemName: "folder")
-                .font(.system(size: 24))
+                .font(.system(size: 28))
                 .foregroundStyle(.white.opacity(0.55))
             Text("Пока нет проектов")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.headline)
                 .foregroundStyle(.white)
             Text("Проект — это папка: чаты, файлы и рабочая папка агента.")
-                .font(.system(size: 12.5))
-                .foregroundStyle(.white.opacity(0.44))
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.5))
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 34)
-        .padding(.horizontal, 18)
-        .background(.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 22))
+        .padding(.vertical, 40)
+        .padding(.horizontal, 22)
+        .background(.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 24))
         .overlay(
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: 24)
                 .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
                 .foregroundStyle(.white.opacity(0.14))
         )
@@ -176,31 +187,34 @@ struct ProjectCard: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: "folder")
-                .font(.system(size: 16))
+                .font(.system(size: 18))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .frame(width: Theme.iconSide, height: Theme.iconSide)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(project.name)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(.white)
                 Text(subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
             }
 
             Spacer(minLength: 8)
 
             Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.26))
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.3))
         }
-        .padding(13)
-        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1), lineWidth: 1))
+        .padding(16)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
@@ -214,14 +228,14 @@ struct ProjectView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 if let project {
                     if project.chats.isEmpty {
                         Text("В проекте пока нет чатов.\nСоздай первый — кнопкой справа сверху.")
-                            .font(.system(size: 13))
-                            .foregroundStyle(.white.opacity(0.44))
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.5))
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 24)
+                            .padding(.top, 28)
                     } else {
                         ForEach(project.chats) { chat in
                             NavigationLink(value: ChatRoute(projectID: projectID, chatID: chat.id)) {
@@ -232,8 +246,9 @@ struct ProjectView: View {
                     }
                 }
             }
-            .padding(20)
-            .padding(.bottom, 90)
+            .padding(.horizontal, Theme.hPad)
+            .padding(.top, 8)
+            .padding(.bottom, 100)
             .animation(.snappy(duration: 0.28), value: project?.chats)
         }
         .scrollIndicators(.hidden)
@@ -248,6 +263,7 @@ struct ProjectView: View {
                     }
                 } label: {
                     Image(systemName: "square.and.pencil")
+                        .font(.system(size: 17))
                 }
                 .tint(.white)
             }
@@ -269,33 +285,36 @@ struct ChatRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: "bubble.left")
-                .font(.system(size: 15))
+                .font(.system(size: 17))
                 .foregroundStyle(.white)
-                .frame(width: 36, height: 36)
-                .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 12))
+                .frame(width: Theme.iconSide, height: Theme.iconSide)
+                .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(chat.title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.body.weight(.medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(1)
             }
 
             Spacer(minLength: 8)
 
             Text(chat.updatedAt, format: .dateTime.hour().minute())
-                .font(.system(size: 10.5, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.26))
+                .font(.footnote.monospaced())
+                .foregroundStyle(.white.opacity(0.3))
         }
-        .padding(13)
-        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.1), lineWidth: 1))
+        .padding(16)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
     }
 }
 
@@ -314,19 +333,19 @@ struct ChatView: View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         if messages.isEmpty {
-                            VStack(alignment: .leading, spacing: 6) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 Text("Чат создан")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.headline)
                                     .foregroundStyle(.white)
-                                Text("Напиши первое сообщение. Модель пока не подключена — ответы появятся, когда добавим ключ и агентский цикл.")
-                                    .font(.system(size: 12.5))
-                                    .foregroundStyle(.white.opacity(0.44))
+                                Text("Напиши первое сообщение. Модель пока не подключена к чату — ответы появятся, когда проведём ключ в ядро.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.white.opacity(0.5))
                             }
-                            .padding(14)
+                            .padding(18)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 16))
+                            .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 20))
                         }
 
                         ForEach(messages) { message in
@@ -334,7 +353,8 @@ struct ChatView: View {
                                 .id(message.id)
                         }
                     }
-                    .padding(18)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 16)
                 }
                 .onChange(of: messages.count) { _, _ in
                     if let last = messages.last {
@@ -365,22 +385,22 @@ struct ChatView: View {
     }
 
     private var composer: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             TextField("Что сделать?", text: $draft, axis: .vertical)
                 .focused($focused)
-                .font(.system(size: 14.5))
+                .font(.body)
                 .foregroundStyle(.white)
                 .lineLimit(1...5)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
             Button {
                 send()
             } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.black)
-                    .frame(width: 34, height: 34)
+                    .frame(width: 40, height: 40)
                     .background(.white, in: Circle())
             }
             .buttonStyle(.plain)
@@ -388,8 +408,11 @@ struct ChatView: View {
             .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
             .padding(.trailing, 8)
         }
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 22))
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(.white.opacity(0.1), lineWidth: 1))
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26))
+        .overlay(
+            RoundedRectangle(cornerRadius: 26)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color.black)
@@ -413,16 +436,16 @@ struct MessageBubble: View {
             if message.role == .assistant { Spacer(minLength: 40) }
 
             Text(message.text)
-                .font(.system(size: 14))
+                .font(.body)
                 .foregroundStyle(.white)
-                .padding(.horizontal, 13)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(
-                    .white.opacity(message.role == .user ? 0.10 : 0.035),
-                    in: RoundedRectangle(cornerRadius: 16)
+                    .white.opacity(message.role == .user ? 0.11 : 0.04),
+                    in: RoundedRectangle(cornerRadius: 20)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 20)
                         .stroke(.white.opacity(0.1), lineWidth: 1)
                 )
 
@@ -436,21 +459,21 @@ struct MessageBubble: View {
 struct AppsView: View {
     var body: some View {
         Screen(kicker: "Мини-аппы", title: "Свои штуки") {
-            VStack(spacing: 12) {
+            VStack(spacing: 14) {
                 Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 24))
+                    .font(.system(size: 28))
                     .foregroundStyle(.white.opacity(0.6))
                 Text("Пока пусто")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.headline)
                 Text("Скажи агенту в чате — он соберёт мини-апп и положит сюда.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(32)
+            .padding(36)
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 26)
                     .stroke(style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
                     .foregroundStyle(.white.opacity(0.16))
             )
@@ -461,7 +484,7 @@ struct AppsView: View {
 struct AgentsView: View {
     var body: some View {
         Screen(kicker: "Агенты", title: "Кто работает") {
-            VStack(spacing: 8) {
+            VStack(spacing: 10) {
                 Row(icon: "sparkle", title: "Основной", subtitle: "Универсальный · deepseek-chat")
                 Row(icon: "chevron.left.forwardslash.chevron.right", title: "Кодер", subtitle: "Пишет и правит код")
                 Row(icon: "house", title: "Дом", subtitle: "Бытовые задачи и списки")
@@ -473,25 +496,24 @@ struct AgentsView: View {
 struct TasksView: View {
     var body: some View {
         Screen(kicker: "Панель", title: "Задачи") {
-            VStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Text("В работе 0")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12).padding(.vertical, 8)
                         .background(.white, in: Capsule())
                         .foregroundStyle(.black)
                     Text("Ждут 0")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12).padding(.vertical, 8)
                         .overlay(Capsule().stroke(.white.opacity(0.17)))
                         .foregroundStyle(.white.opacity(0.64))
                     Spacer()
                 }
-                .padding(.bottom, 6)
 
                 Text("Задач пока нет. Они появятся, когда агент начнёт работать.")
-                    .font(.system(size: 12.5))
-                    .foregroundStyle(.white.opacity(0.44))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -505,7 +527,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             Screen(kicker: "Профиль", title: "Настройки") {
-                VStack(spacing: 8) {
+                VStack(spacing: 10) {
                     Button {
                         showSetup = true
                     } label: {

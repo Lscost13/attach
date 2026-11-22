@@ -21,35 +21,22 @@ struct ModelSetupView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
+                VStack(alignment: .leading, spacing: 26) {
                     if isOnboarding {
                         header
                     }
 
-                    section("Провайдер") {
-                        providerGrid
-                    }
-
-                    section("Ключ API") {
-                        keyField
-                    }
-
-                    section("Модель") {
-                        modelField
-                    }
-
-                    if models.provider == .custom || !baseURL.isEmpty {
-                        section("Адрес") {
-                            baseURLField
-                        }
-                    }
+                    section("Провайдер") { providerGrid }
+                    section("Ключ API") { keyField }
+                    section("Модель") { modelField }
+                    section("Адрес") { baseURLField }
 
                     checkRow
-
                     actions
                 }
-                .padding(20)
-                .padding(.bottom, 30)
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 40)
             }
             .scrollIndicators(.hidden)
             .background(Color.black)
@@ -76,36 +63,36 @@ struct ModelSetupView: View {
     // MARK: - Блоки
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Attach")
-                .font(.system(size: 11, weight: .semibold))
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ATTACH")
+                .font(.caption2.weight(.semibold))
                 .tracking(2)
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.white.opacity(0.32))
 
             Text("Подключи модель")
-                .font(.system(size: 28, weight: .semibold))
+                .font(.largeTitle.weight(.semibold))
                 .foregroundStyle(.white)
 
             Text("Ключ хранится в Keychain и никуда не уходит. Можно выбрать любого провайдера или свой endpoint.")
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.45))
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.5))
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.bottom, 4)
+        .padding(.bottom, 2)
     }
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .semibold))
+                .font(.caption2.weight(.semibold))
                 .tracking(1.4)
-                .foregroundStyle(.white.opacity(0.28))
+                .foregroundStyle(.white.opacity(0.32))
             content()
         }
     }
 
     private var providerGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
             ForEach(ProviderKind.allCases) { kind in
                 Button {
                     withAnimation(.snappy(duration: 0.22)) {
@@ -114,22 +101,22 @@ struct ModelSetupView: View {
                         baseURL = models.baseURL
                     }
                 } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 9) {
                         Image(systemName: kind.glyph)
-                            .font(.system(size: 14))
+                            .font(.system(size: 16))
                         Text(kind.title)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.subheadline.weight(.medium))
                         Spacer(minLength: 0)
                     }
                     .foregroundStyle(models.provider == kind ? .black : .white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
                     .background(
                         models.provider == kind ? Color.white : Color.white.opacity(0.05),
-                        in: RoundedRectangle(cornerRadius: 14)
+                        in: RoundedRectangle(cornerRadius: 16)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
+                        RoundedRectangle(cornerRadius: 16)
                             .stroke(.white.opacity(models.provider == kind ? 0 : 0.1), lineWidth: 1)
                     )
                 }
@@ -140,51 +127,51 @@ struct ModelSetupView: View {
 
     private var keyField: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "key")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white.opacity(0.45))
                 SecureField(models.hasKey ? "ключ сохранён — можно заменить" : "sk-…", text: $key)
-                    .font(.system(size: 14, design: .monospaced))
+                    .font(.body.monospaced())
                     .foregroundStyle(.white)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
             }
-            .padding(13)
-            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.1), lineWidth: 1))
+            .padding(15)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.1), lineWidth: 1))
 
             Text(models.provider.hint)
-                .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.3))
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.35))
         }
     }
 
     private var modelField: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("имя модели", text: $model)
-                .font(.system(size: 14, design: .monospaced))
+                .font(.body.monospaced())
                 .foregroundStyle(.white)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .padding(13)
-                .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.1), lineWidth: 1))
+                .padding(15)
+                .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.1), lineWidth: 1))
 
             if !models.provider.models.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         ForEach(models.provider.models, id: \.self) { preset in
                             Button {
                                 withAnimation(.snappy(duration: 0.18)) { model = preset }
                             } label: {
                                 Text(preset)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(model == preset ? .black : .white.opacity(0.7))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 7)
+                                    .font(.footnote.monospaced())
+                                    .foregroundStyle(model == preset ? .black : .white.opacity(0.75))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 9)
                                     .background(
-                                        model == preset ? Color.white : Color.white.opacity(0.06),
+                                        model == preset ? Color.white : Color.white.opacity(0.07),
                                         in: Capsule()
                                     )
                             }
@@ -198,14 +185,14 @@ struct ModelSetupView: View {
 
     private var baseURLField: some View {
         TextField("https://…/v1", text: $baseURL)
-            .font(.system(size: 13, design: .monospaced))
+            .font(.subheadline.monospaced())
             .foregroundStyle(.white)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .keyboardType(.URL)
-            .padding(13)
-            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.1), lineWidth: 1))
+            .padding(15)
+            .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.1), lineWidth: 1))
     }
 
     @ViewBuilder
@@ -214,31 +201,31 @@ struct ModelSetupView: View {
         case .idle:
             EmptyView()
         case .checking:
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 ProgressView().tint(.white)
                 Text("Проверяю ключ…")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.55))
             }
         case .ok(let message):
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 Image(systemName: "checkmark.circle.fill")
                 Text(message)
             }
-            .font(.system(size: 12, weight: .medium))
+            .font(.subheadline.weight(.medium))
             .foregroundStyle(.white)
         case .failed(let message):
-            HStack(spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "exclamationmark.triangle")
                 Text(message)
             }
-            .font(.system(size: 12))
+            .font(.subheadline)
             .foregroundStyle(.white.opacity(0.6))
         }
     }
 
     private var actions: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Button {
                 Task {
                     models.model = model
@@ -249,12 +236,12 @@ struct ModelSetupView: View {
                 }
             } label: {
                 Text("Проверить ключ")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(.white.opacity(0.12), lineWidth: 1))
+                    .padding(.vertical, 17)
+                    .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 18))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(.white.opacity(0.12), lineWidth: 1))
             }
             .buttonStyle(.plain)
 
@@ -266,11 +253,11 @@ struct ModelSetupView: View {
                 dismiss()
             } label: {
                 Text(isOnboarding ? "Сохранить и войти" : "Сохранить")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(.black)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                    .padding(.vertical, 18)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 18))
             }
             .buttonStyle(.plain)
             .disabled(!canSave)
@@ -282,7 +269,7 @@ struct ModelSetupView: View {
                     dismiss()
                 } label: {
                     Text("Удалить ключ")
-                        .font(.system(size: 12.5))
+                        .font(.footnote)
                         .foregroundStyle(.white.opacity(0.45))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -290,6 +277,6 @@ struct ModelSetupView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.top, 6)
+        .padding(.top, 4)
     }
 }
