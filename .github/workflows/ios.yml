@@ -12,12 +12,23 @@ concurrency:
 jobs:
   build:
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.manul.attach' }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Кэш Node-фреймворка
+        uses: actions/cache@v4
+        with:
+          path: vendor/nodejs-mobile
+          key: nodejs-mobile-24.20.0-0
+
+      - name: Скачать NodeMobile
+        run: |
+          chmod +x scripts/fetch-node.sh
+          ./scripts/fetch-node.sh
 
       - name: Выбрать Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -52,11 +63,12 @@ jobs:
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
           if [ -z "$APP" ]; then echo "::error::.app не найден"; exit 1; fi
           echo "app: $APP"
+          du -sh "$APP"
           rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qry Attach.ipa Payload
-          unzip -l Attach.ipa | head -n 20
+          unzip -l Attach.ipa | head -n 30
 
       - name: Артефакт
         uses: actions/upload-artifact@v4

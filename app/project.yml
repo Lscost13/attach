@@ -16,6 +16,13 @@ targets:
     platform: iOS
     sources:
       - path: Attach
+      - path: Engine
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - framework: ../vendor/nodejs-mobile/NodeMobile.xcframework
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.manul.attach
@@ -32,6 +39,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIUserInterfaceStyle: Dark
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
         UILaunchScreen:
           UIColorName: ""
         UISupportedInterfaceOrientations:

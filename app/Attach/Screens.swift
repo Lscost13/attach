@@ -73,14 +73,18 @@ struct Row: View {
 // MARK: - Экраны
 
 struct ChatsView: View {
+    @StateObject private var core = CoreRuntime.shared
+
     var body: some View {
         Screen(kicker: "Чаты", title: "Проекты") {
+            CoreStatusRow(phase: core.phase)
             VStack(spacing: 8) {
                 Row(icon: "folder", title: "Парсер", subtitle: "3 чата · сегодня", trailing: "›")
                 Row(icon: "folder", title: "Дом", subtitle: "5 чатов · вчера", trailing: "›")
                 Row(icon: "folder", title: "Работа", subtitle: "2 чата · 12 ноя", trailing: "›")
             }
         }
+        .task { core.bootIfNeeded() }
     }
 }
 
