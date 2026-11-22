@@ -1,4 +1,4 @@
-name: Pocket
+name: Attach
 options:
   bundleIdPrefix: com.manul
   deploymentTarget:
@@ -11,24 +11,24 @@ settings:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 targets:
-  Pocket:
+  Attach:
     type: application
     platform: iOS
     sources:
-      - path: Pocket
+      - path: Attach
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.manul.pocket
-        PRODUCT_NAME: Pocket
+        PRODUCT_BUNDLE_IDENTIFIER: com.manul.attach
+        PRODUCT_NAME: Attach
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         CODE_SIGN_STYLE: Automatic
         ENABLE_USER_SCRIPT_SANDBOXING: YES
         SWIFT_EMIT_LOC_STRINGS: NO
     info:
-      path: Pocket/Info.plist
+      path: Attach/Info.plist
       properties:
-        CFBundleDisplayName: Пульт
+        CFBundleDisplayName: Attach
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIUserInterfaceStyle: Dark

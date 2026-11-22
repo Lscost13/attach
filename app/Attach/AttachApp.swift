@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct PocketApp: App {
+struct AttachApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()

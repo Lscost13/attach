@@ -14,7 +14,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
-      BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.manul.pocket' }}
+      BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.manul.attach' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +35,8 @@ jobs:
         working-directory: app
         run: |
           xcodebuild build \
-            -project Pocket.xcodeproj \
-            -scheme Pocket \
+            -project Attach.xcodeproj \
+            -scheme Attach \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$PWD/build" \
@@ -52,15 +52,15 @@ jobs:
           APP=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -n 1)
           if [ -z "$APP" ]; then echo "::error::.app не найден"; exit 1; fi
           echo "app: $APP"
-          rm -rf Payload Pocket.ipa
+          rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
-          zip -qry Pocket.ipa Payload
-          unzip -l Pocket.ipa | head -n 20
+          zip -qry Attach.ipa Payload
+          unzip -l Attach.ipa | head -n 20
 
       - name: Артефакт
         uses: actions/upload-artifact@v4
         with:
-          name: Pocket-ipa
-          path: app/Pocket.ipa
+          name: Attach-ipa
+          path: app/Attach.ipa
           if-no-files-found: error
