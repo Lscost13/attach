@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# XcodeGen генерирует это сам
+app/Pocket.xcodeproj/
+app/Pocket/Info.plist
+app/build/
+app/ExportOptions.plist
+
+# Прототип
+design/.shots/

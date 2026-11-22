@@ -1,0 +1,833 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#000000" />
+<title>Пульт — прототип 2</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+:root{
+  --bg:#000; --fg:#fff;
+  --d1:rgba(255,255,255,.64); --d2:rgba(255,255,255,.44); --d3:rgba(255,255,255,.26);
+  --line:rgba(255,255,255,.10); --line2:rgba(255,255,255,.17);
+  --card:rgba(255,255,255,.035); --card2:rgba(255,255,255,.07);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+body{
+  background:#000; color:var(--fg); font-family:var(--sans);
+  -webkit-font-smoothing:antialiased; display:grid; place-items:center;
+  min-height:100dvh; padding:26px 16px; gap:14px;
+}
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none;
+  background:radial-gradient(70% 50% at 50% -10%, rgba(255,255,255,.055), transparent 70%);
+}
+.stage{display:grid; justify-items:center; gap:12px; position:relative}
+.caption{font:500 10.5px/1 var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--d3)}
+.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.sprite{display:none}
+
+/* ---------- device ---------- */
+.phone{
+  position:relative; width:390px; height:844px; background:var(--bg); border-radius:52px;
+  box-shadow:0 0 0 10px #0C0C0C, 0 0 0 11px rgba(255,255,255,.10), 0 40px 120px -30px rgba(255,255,255,.10);
+  overflow:hidden; display:flex; flex-direction:column; isolation:isolate;
+}
+.notch{position:absolute; top:11px; left:50%; transform:translateX(-50%); width:112px; height:30px; background:#000; border-radius:20px; z-index:50; box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.views{position:relative; flex:1; overflow:hidden}
+
+/* ---------- views ---------- */
+.view{
+  position:absolute; inset:0; overflow-y:auto; overflow-x:hidden;
+  padding:22px 18px 108px; scrollbar-width:none; display:none;
+}
+.view::-webkit-scrollbar{display:none}
+.view.active{display:block; animation:in .24s ease both}
+@keyframes in{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+
+.view-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:4px}
+.kicker{font:600 10.5px/1 var(--sans); letter-spacing:.16em; text-transform:uppercase; color:var(--d3)}
+.h1{font:600 27px/1.15 var(--sans); letter-spacing:-.025em; margin:9px 0 0}
+.sub{font:400 12.5px/1.4 var(--sans); color:var(--d2); margin-top:5px}
+.avatar{
+  width:38px;height:38px;border-radius:50%;border:1px solid var(--line2);
+  background:rgba(255,255,255,.06); color:var(--fg);
+  font:600 14px var(--sans); display:grid; place-items:center; cursor:pointer; flex:none;
+}
+.round-btn{
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--line2);
+  background:rgba(255,255,255,.05); color:var(--fg); display:grid; place-items:center; cursor:pointer; flex:none;
+}
+.round-btn:active{background:var(--card2)}
+
+/* ---------- list ---------- */
+.item{
+  display:flex; align-items:center; gap:12px; width:100%; text-align:left;
+  padding:13px 14px; border-radius:18px; background:var(--card); border:1px solid var(--line);
+  color:var(--fg); font-family:inherit; margin-bottom:8px; cursor:pointer;
+}
+.item:active{background:var(--card2)}
+.ico{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--fg);flex:none}
+.ico .i{width:18px;height:18px}
+.main{flex:1; min-width:0}
+.title{display:block; font:500 14px/1.3 var(--sans); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.meta{display:block; font:400 11.5px/1.4 var(--sans); color:var(--d2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px}
+.right{font:500 10.5px var(--mono); color:var(--d3); flex:none}
+.chev{color:var(--d3); font:400 18px/1 var(--sans); flex:none}
+
+.section{font:600 12.5px/1 var(--sans); color:var(--d2); margin:22px 2px 10px; display:flex; justify-content:space-between; align-items:baseline}
+.link{background:none;border:0;color:var(--fg);font:500 12px var(--sans);cursor:pointer;padding:2px}
+
+/* ---------- chips / pills ---------- */
+.chip{
+  display:inline-flex; align-items:center; gap:6px; font:600 10px/1 var(--sans); letter-spacing:.06em;
+  text-transform:uppercase; padding:6px 9px; border-radius:99px;
+  border:1px solid var(--line2); color:var(--d1);
+}
+.chip.solid{background:var(--fg); color:#000; border-color:var(--fg)}
+.chips{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 2px}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1} 50%{opacity:.25}}
+
+/* ---------- glass tabbar ---------- */
+.tabbar{
+  position:absolute; left:14px; right:14px; bottom:16px; height:68px; z-index:30;
+  display:flex; align-items:center; padding:0 7px; border-radius:34px;
+  background:
+    radial-gradient(120% 150% at 50% -30%, rgba(255,255,255,.30), transparent 62%),
+    linear-gradient(180deg, rgba(255,255,255,.17), rgba(255,255,255,.06) 45%, rgba(255,255,255,.11));
+  -webkit-backdrop-filter:blur(30px) saturate(200%);
+  backdrop-filter:blur(30px) saturate(200%);
+  border:1px solid rgba(255,255,255,.26);
+  box-shadow:
+    0 18px 50px rgba(0,0,0,.85),
+    0 0 0 .5px rgba(255,255,255,.10),
+    inset 0 1px 0 rgba(255,255,255,.55),
+    inset 0 -14px 22px -14px rgba(255,255,255,.20);
+  transition:transform .26s ease, opacity .2s ease;
+}
+.tabbar.hidden{transform:translateY(140%); opacity:0; pointer-events:none}
+.tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  height:52px; border:0; background:transparent; color:var(--d2);
+  font:500 9.5px/1 var(--sans); letter-spacing:.01em; cursor:pointer; border-radius:26px;
+  transition:background .18s ease, color .18s ease;
+}
+.tab .i{width:21px;height:21px}
+.tab.active{color:#fff; background:linear-gradient(180deg, rgba(255,255,255,.24), rgba(255,255,255,.12)); box-shadow:inset 0 1px 0 rgba(255,255,255,.45), 0 2px 10px rgba(0,0,0,.35)}
+.tab:active{background:rgba(255,255,255,.10)}
+
+/* ---------- cards ---------- */
+.card{border:1px solid var(--line); border-radius:22px; background:var(--card); padding:16px}
+.card.glow{background:
+  radial-gradient(120% 100% at 100% 0%, rgba(255,255,255,.10), transparent 60%),
+  linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));}
+
+/* running task */
+.run{position:relative; overflow:hidden}
+.run-top{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
+.run-title{font:600 18px/1.25 var(--sans); letter-spacing:-.01em}
+.run-sub{font:400 12.5px/1.4 var(--sans); color:var(--d2); margin-top:4px}
+.bar{height:3px;border-radius:99px;background:rgba(255,255,255,.14);overflow:hidden;margin:14px 0 12px}
+.bar span{display:block;height:100%;background:#fff;border-radius:99px}
+.run-foot{display:flex; align-items:center; justify-content:space-between}
+.btn{
+  padding:10px 14px; border-radius:13px; border:1px solid var(--line2); background:rgba(255,255,255,.05);
+  color:var(--fg); font:600 12.5px var(--sans); cursor:pointer;
+}
+.btn.primary{background:var(--fg); border-color:var(--fg); color:#000}
+.btn:active{transform:scale(.985)}
+.btn.sm{padding:8px 11px; font-size:11.5px; border-radius:11px}
+
+/* ---------- agent rows ---------- */
+.agent-row{display:flex; align-items:center; gap:12px; padding:13px 14px; border:1px solid var(--line); border-radius:18px; background:var(--card); margin-bottom:8px; cursor:pointer}
+.agent-ava{width:40px;height:40px;border-radius:14px;background:rgba(255,255,255,.08);display:grid;place-items:center;font:600 15px var(--sans);flex:none}
+
+/* ---------- settings rows ---------- */
+.group{border:1px solid var(--line); border-radius:18px; overflow:hidden; margin-bottom:14px; background:var(--card)}
+.grow{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 15px; border-bottom:1px solid var(--line)}
+.group .grow:last-child{border-bottom:0}
+.label{font:400 13.5px/1.35 var(--sans)}
+.hint{font:400 11px/1.35 var(--sans); color:var(--d3); margin-top:2px}
+.val{font:500 12px var(--mono); color:var(--d2); flex:none}
+.glabel{font:600 10.5px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:var(--d3); margin:20px 4px 8px}
+.sw{position:relative; width:44px; height:27px; border-radius:99px; background:rgba(255,255,255,.16); transition:.18s; flex:none; cursor:pointer}
+.sw::after{content:""; position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff; transition:.18s}
+.sw.on{background:rgba(255,255,255,.9)}
+.sw.on::after{transform:translateX(17px); background:#000}
+
+/* ---------- chat ---------- */
+.view.chat{padding:0; display:none; flex-direction:column}
+.view.chat.active{display:flex}
+.chat-head{
+  display:flex; align-items:center; gap:10px; padding:16px 14px 12px;
+  border-bottom:1px solid var(--line); background:rgba(0,0,0,.82); backdrop-filter:blur(18px);
+}
+.icon-btn{width:34px;height:34px;border-radius:12px;border:0;background:transparent;color:var(--d1);display:grid;place-items:center;cursor:pointer}
+.icon-btn:active{background:rgba(255,255,255,.06)}
+.chat-title{flex:1; min-width:0}
+.chat-title b{display:block; font:600 14.5px/1.3 var(--sans); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.chat-title span{font:500 10.5px/1.4 var(--mono); color:var(--d3)}
+.chat-scroll{flex:1; overflow-y:auto; padding:16px 16px 8px; scrollbar-width:none}
+.chat-scroll::-webkit-scrollbar{display:none}
+
+.plan{border:1px solid var(--line); border-radius:16px; background:var(--card); padding:12px 13px; margin-bottom:16px}
+.plan-head{display:flex; justify-content:space-between; font:600 10px/1 var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--d3); margin-bottom:10px}
+.step{display:flex; align-items:center; gap:9px; font:400 12.5px/1.9 var(--sans); color:var(--d2)}
+.step .i{width:13px;height:13px}
+.step.done{color:var(--d3); text-decoration:line-through; text-decoration-color:rgba(255,255,255,.2)}
+.ring{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--d3);flex:none}
+.step.active{color:var(--fg)}
+.step.active .ring{border-color:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.10); animation:pulse 1.8s infinite}
+
+.msg{display:flex; gap:10px; margin-bottom:14px}
+.msg .bubble{font:400 14px/1.55 var(--sans); color:var(--fg)}
+.msg.user{justify-content:flex-end}
+.msg.user .bubble{background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); padding:10px 13px; border-radius:18px 18px 5px 18px; max-width:82%}
+.who{font:600 9.5px/1 var(--sans); letter-spacing:.12em; text-transform:uppercase; color:var(--d3); margin-bottom:7px}
+.tool{display:flex; align-items:center; gap:8px; font:500 11.5px/1.4 var(--mono); color:var(--d3); border-left:2px solid rgba(255,255,255,.12); padding:2px 0 2px 10px; margin:0 0 12px 2px}
+.tool .i{width:13px;height:13px}
+code{font:500 12.5px var(--mono); background:rgba(255,255,255,.10); padding:1.5px 5px; border-radius:6px; color:#fff}
+.diff{margin:11px 0 0; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.02)}
+.diff div{font:12px/1.75 var(--mono); padding:1px 12px; white-space:pre; overflow-x:auto; color:var(--d1)}
+.diff .add{background:rgba(255,255,255,.07); color:#fff}
+.diff .del{background:rgba(255,255,255,.02); color:var(--d2)}
+
+.approval{border:1px solid rgba(255,255,255,.22); border-radius:18px; padding:14px; margin:4px 0 16px; background:rgba(255,255,255,.05)}
+.approval b{display:block; font:600 13.5px/1.35 var(--sans); margin-bottom:5px}
+.approval p{margin:0 0 12px; font:400 12px/1.45 var(--sans); color:var(--d2)}
+.approval .cmd{font:500 12px var(--mono); color:#fff; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.16); border-radius:9px; padding:7px 10px; display:inline-block; margin-bottom:12px}
+.btn-row{display:flex; gap:8px}
+.btn-row .btn{flex:1; text-align:center}
+.ok{font:600 12.5px/1.4 var(--sans); color:#fff; display:flex; align-items:center; gap:7px}
+
+.composer{padding:10px 13px calc(14px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:#000}
+.inputwrap{display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.06); border:1px solid var(--line2); border-radius:23px; padding:7px 7px 7px 13px}
+.inputwrap input{flex:1; min-width:0; background:none; border:0; outline:none; color:var(--fg); font:14.5px var(--sans); padding:7px 0}
+.inputwrap input::placeholder{color:var(--d3)}
+.mic-btn{width:32px;height:32px;border-radius:50%;border:0;background:rgba(255,255,255,.08);color:var(--d1);display:grid;place-items:center;cursor:pointer}
+.send{width:34px;height:34px;border-radius:50%;border:0;background:#fff;color:#000;display:grid;place-items:center;cursor:pointer}
+.send .i{width:17px;height:17px;stroke-width:2.2}
+
+/* ---------- files ---------- */
+.crumbs{display:flex; align-items:center; gap:6px; margin:14px 2px 12px; font:500 12px var(--mono); color:var(--d3)}
+.crumbs b{color:var(--fg); font-weight:500}
+.storage{margin-top:16px}
+.storage .bar{margin:8px 0 6px}
+.storage p{margin:0;font:400 11px/1.4 var(--sans); color:var(--d3)}
+
+/* ---------- empty ---------- */
+.empty{display:grid; place-items:center; text-align:center; gap:12px; padding:54px 22px; border:1px dashed rgba(255,255,255,.16); border-radius:24px; margin-top:20px}
+.empty .ring-lg{width:62px;height:62px;border-radius:50%;border:1px solid rgba(255,255,255,.20);display:grid;place-items:center}
+.empty h3{margin:0; font:600 16px/1.3 var(--sans)}
+.empty p{margin:0; font:400 12.5px/1.5 var(--sans); color:var(--d2); max-width:250px}
+
+/* ---------- preview ---------- */
+.preview{position:absolute; inset:0; z-index:60; display:none; align-items:flex-end; padding:14px; background:rgba(0,0,0,.72); backdrop-filter:blur(16px)}
+.preview.show{display:flex; animation:in .2s ease both}
+.sheet{width:100%; max-height:76%; overflow:auto; background:#0A0A0A; border:1px solid var(--line2); border-radius:24px; padding:16px}
+.sheet-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px}
+.sheet-head b{font:600 14px var(--mono)}
+.code{font:12px/1.8 var(--mono); color:rgba(255,255,255,.82); background:#000; border:1px solid var(--line); border-radius:14px; padding:12px; overflow-x:auto; white-space:pre; margin:0}
+.code .kw{color:#fff}
+.code .str{color:rgba(255,255,255,.75)}
+.code .cm{color:rgba(255,255,255,.34)}
+
+/* ---------- toast ---------- */
+.toast{
+  position:absolute; left:50%; bottom:104px; transform:translate(-50%,14px); z-index:80;
+  padding:10px 14px; border-radius:14px; background:rgba(18,18,18,.96); border:1px solid var(--line2);
+  font:500 12px var(--sans); color:var(--fg); opacity:0; pointer-events:none; transition:.22s ease; white-space:nowrap;
+}
+.toast.show{opacity:1; transform:translate(-50%,0)}
+
+@media (min-width:521px){
+  .view{padding-top:54px}
+  .chat-head{padding-top:54px}
+}
+@media (max-width:520px){
+  body{padding:0; display:block; background:var(--bg)}
+  body::before{display:none}
+  .caption{display:none}
+  .stage{display:block; width:100%}
+  .phone{width:100%; height:100dvh; min-height:100dvh; border-radius:0; box-shadow:none}
+  .notch{display:none}
+  .view{padding-top:calc(18px + env(safe-area-inset-top))}
+  .chat-head{padding-top:calc(14px + env(safe-area-inset-top))}
+  .tabbar{bottom:calc(16px + env(safe-area-inset-bottom))}
+}
+</style>
+</head>
+<body>
+
+<svg class="sprite" aria-hidden="true">
+  <symbol id="i-chats" viewBox="0 0 24 24"><path d="M3.2 8.35c0-1.35 1.1-2.45 2.45-2.45h3.15c.66 0 1.3.26 1.76.73l1.03 1.03c.47.47 1.1.73 1.76.73h5.2c1.35 0 2.45 1.1 2.45 2.45v6.5c0 1.35-1.1 2.45-2.45 2.45H5.65c-1.35 0-2.45-1.1-2.45-2.45z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M12 3.6c4.9 0 8.9 3.4 8.9 7.6s-4 7.6-8.9 7.6c-1.5 0-3-.3-4.2-.9L3.4 20l1.2-4.2c-1-1.3-1.5-2.9-1.5-4.6 0-4.2 4-7.6 8.9-7.6z"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7.2" height="7.2" rx="2.15"/><rect x="13.4" y="3.4" width="7.2" height="7.2" rx="2.15"/><rect x="3.4" y="13.4" width="7.2" height="7.2" rx="2.15"/><rect x="13.4" y="13.4" width="7.2" height="7.2" rx="2.15"/></symbol>
+  <symbol id="i-agents" viewBox="0 0 24 24"><path d="M12 2.6c.9 4.9 3.6 7.6 8.5 8.5-4.9.9-7.6 3.6-8.5 8.5-.9-4.9-3.6-7.6-8.5-8.5 4.9-.9 7.6-3.6 8.5-8.5Z"/></symbol>
+  <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M9.2 6.6h10.4M9.2 12h10.4M9.2 17.4h7.4"/><circle cx="5" cy="6.6" r="1.35" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.35" fill="currentColor" stroke="none"/><circle cx="5" cy="17.4" r="1.35" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-profile" viewBox="0 0 24 24"><circle cx="12" cy="8.3" r="3.7"/><path d="M4.9 20c.6-3.9 3.5-6.1 7.1-6.1s6.5 2.2 7.1 6.1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.4v13.2M5.4 12h13.2"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9.3" y="3.2" width="5.4" height="10.4" rx="2.7"/><path d="M5.9 11.3a6.1 6.1 0 0 0 12.2 0M12 17.4v3.2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.6 5.6 8.2 12l6.4 6.4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19.2V5.6M6.6 11 12 5.6l5.4 5.4"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="M9.4 8.4 5.6 12l3.8 3.6M14.6 8.4 18.4 12l-3.8 3.6"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3.6h6.1l4.5 4.5v12.3H7z"/><path d="M13.1 3.6v4.5h4.5"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3.4" y="4.9" width="17.2" height="14.2" rx="2.8"/><circle cx="9.1" cy="10" r="1.45"/><path d="M20.6 16.3 15.2 11 9.4 17"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.4 9.6 17.2 19 7.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8.9 6.5 18.2 12 8.9 17.5z"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.4" cy="12" r="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-clip" viewBox="0 0 24 24"><path d="M18.9 11.4l-7.05 7.05a4.35 4.35 0 0 1-6.15-6.15l8.3-8.3a2.9 2.9 0 0 1 4.1 4.1l-8.3 8.3a1.45 1.45 0 0 1-2.05-2.05l7.2-7.2"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13.1 3.2 6.3 13.4h4.7l-.9 7.4 6.9-10.2h-4.6z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8.1" cy="15.2" r="3.6"/><path d="M10.7 12.6 18.5 4.8M16.1 5.8l2.4 2.4M13.7 8.2l2.2 2.2"/></symbol>
+</svg>
+
+<main class="stage">
+  <span class="caption">прототип 2 · чёрный / белый · liquid glass</span>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="views">
+
+      <!-- ================= ЧАТЫ (проекты) ================= -->
+      <section class="view active" id="v-chats">
+        <div class="view-head">
+          <div>
+            <div class="kicker">Чаты</div>
+            <h1 class="h1">Проекты</h1>
+          </div>
+          <button class="round-btn" data-toast="Новый проект"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="sub">Разложено по папкам — как в файлах.</div>
+
+        <div style="height:18px"></div>
+
+        <button class="item" data-project="parser">
+          <span class="ico"><svg class="i"><use href="#i-chats"/></svg></span>
+          <span class="main"><span class="title">Парсер</span><span class="meta">3 чата · сегодня</span></span>
+          <span class="chev">›</span>
+        </button>
+
+        <button class="item" data-project="home">
+          <span class="ico"><svg class="i"><use href="#i-chats"/></svg></span>
+          <span class="main"><span class="title">Дом</span><span class="meta">5 чатов · вчера</span></span>
+          <span class="chev">›</span>
+        </button>
+
+        <button class="item" data-project="work">
+          <span class="ico"><svg class="i"><use href="#i-chats"/></svg></span>
+          <span class="main"><span class="title">Работа</span><span class="meta">2 чата · 12 ноя</span></span>
+          <span class="chev">›</span>
+        </button>
+
+        <div class="section"><span>Без проекта</span><span class="right">4</span></div>
+
+        <button class="item" data-open="chat">
+          <span class="ico"><svg class="i"><use href="#i-code"/></svg></span>
+          <span class="main"><span class="title">Бот для заметок</span><span class="meta">Ждёт подтверждения</span></span>
+          <span class="right">вчера</span>
+        </button>
+        <button class="item" data-open="chat">
+          <span class="ico"><svg class="i"><use href="#i-img"/></svg></span>
+          <span class="main"><span class="title">Фото щитка → схема</span><span class="meta">Готово · 1 изображение</span></span>
+          <span class="right">09:15</span>
+        </button>
+      </section>
+
+      <!-- ================= ПРОЕКТ ================= -->
+      <section class="view" id="v-project">
+        <div class="view-head">
+          <button class="icon-btn" data-back="chats" style="margin-left:-8px"><svg class="i"><use href="#i-back"/></svg></button>
+          <button class="round-btn" data-toast="Меню проекта: переименовать, удалить"><svg class="i"><use href="#i-dots"/></svg></button>
+        </div>
+        <div class="kicker">Проект</div>
+        <h1 class="h1" id="projectTitle">Парсер</h1>
+        <div class="sub" id="projectSub">3 чата · 6 файлов</div>
+
+        <div class="section"><span>Чаты</span><button class="link" data-toast="Новый чат в проекте">Новый</button></div>
+        <div id="projectChats"></div>
+
+        <div class="section"><span>Файлы</span></div>
+        <button class="item" data-open="files">
+          <span class="ico"><svg class="i"><use href="#i-chats"/></svg></span>
+          <span class="main"><span class="title">Рабочая папка</span><span class="meta">parser.js · notes.md · тесты</span></span>
+          <span class="chev">›</span>
+        </button>
+      </section>
+
+      <!-- ================= МИНИ-АППЫ ================= -->
+      <section class="view" id="v-apps">
+        <div class="view-head">
+          <div>
+            <div class="kicker">Мини-аппы</div>
+            <h1 class="h1">Свои штуки</h1>
+          </div>
+          <button class="round-btn" data-toast="Собрать мини-апп в чате"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+
+        <div class="empty">
+          <div class="ring-lg"><svg class="i" style="width:24px;height:24px"><use href="#i-apps"/></svg></div>
+          <h3>Пока пусто</h3>
+          <p>Скажи агенту в чате «сделай мне трекер привычек» — он соберёт мини-апп и положит сюда. На главный экран тоже можно.</p>
+          <button class="btn primary" data-open="chat" style="margin-top:4px">Создать в чате</button>
+        </div>
+      </section>
+
+      <!-- ================= АГЕНТЫ ================= -->
+      <section class="view" id="v-agents">
+        <div class="view-head">
+          <div>
+            <div class="kicker">Агенты</div>
+            <h1 class="h1">Кто работает</h1>
+          </div>
+          <button class="round-btn" data-toast="Новый агент: имя, роль, модель"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="sub">У каждого своя роль, модель и память. Можно собрать команду.</div>
+
+        <div style="height:18px"></div>
+
+        <div class="agent-row" data-toast="Основной агент">
+          <div class="agent-ava">О</div>
+          <div class="main">
+            <span class="title">Основной</span>
+            <span class="meta">Универсальный · deepseek-chat</span>
+          </div>
+          <span class="chip solid">по умолчанию</span>
+        </div>
+
+        <div class="agent-row" data-toast="Кодер">
+          <div class="agent-ava">К</div>
+          <div class="main">
+            <span class="title">Кодер</span>
+            <span class="meta">Пишет и правит код · deepseek-reasoner</span>
+          </div>
+        </div>
+
+        <div class="agent-row" data-toast="Дом">
+          <div class="agent-ava">Д</div>
+          <div class="main">
+            <span class="title">Дом</span>
+            <span class="meta">Бытовые задачи, списки, сметы</span>
+          </div>
+        </div>
+
+        <button class="btn" style="width:100%; margin-top:6px" data-toast="Создание агента — в следующей сборке">Собрать команду</button>
+      </section>
+
+      <!-- ================= ПАНЕЛЬ ================= -->
+      <section class="view" id="v-panel">
+        <div class="view-head">
+          <div>
+            <div class="kicker">Панель</div>
+            <h1 class="h1">Задачи</h1>
+          </div>
+          <button class="round-btn" data-toast="Обновить состояние"><svg class="i"><use href="#i-bolt"/></svg></button>
+        </div>
+
+        <div style="height:16px"></div>
+
+        <div class="chips">
+          <span class="chip solid">В работе 1</span>
+          <span class="chip">Ждут 1</span>
+          <span class="chip">Готово 9</span>
+        </div>
+
+        <div class="section"><span>В работе</span><span class="right">1</span></div>
+
+        <div class="card glow run">
+          <div class="run-top">
+            <span class="chip"><i class="dot"></i>работает</span>
+            <span class="right">12 мин</span>
+          </div>
+          <div class="run-title">Рефакторинг парсера</div>
+          <div class="run-sub">Шаг 2 из 3 · правит 3 файла</div>
+          <div class="bar"><span style="width:66%"></span></div>
+          <div class="run-foot">
+            <span class="right" style="color:var(--d2)">deepseek-chat · локально</span>
+            <button class="btn sm primary" data-open="chat">Открыть</button>
+          </div>
+        </div>
+
+        <div class="section"><span>Ждут решения</span><span class="right">1</span></div>
+        <div class="card" style="padding:14px">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+            <span class="ico" style="width:30px;height:30px;border-radius:10px"><svg class="i" style="width:15px;height:15px"><use href="#i-play"/></svg></span>
+            <div class="main">
+              <span class="title" style="font-size:13px">npm test</span>
+              <span class="meta">Парсер · ждёт 4 мин</span>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn sm primary" data-approve>Разрешить</button>
+            <button class="btn sm" data-deny>Отклонить</button>
+          </div>
+        </div>
+
+        <div class="section"><span>Готово сегодня</span><span class="right">3</span></div>
+        <button class="item" data-open="chat">
+          <span class="ico"><svg class="i"><use href="#i-check"/></svg></span>
+          <span class="main"><span class="title">Смета на электрику</span><span class="meta">12 позиций</span></span>
+          <span class="right">14:02</span>
+        </button>
+        <button class="item" data-open="chat">
+          <span class="ico"><svg class="i"><use href="#i-doc"/></svg></span>
+          <span class="main"><span class="title">Разбор PDF по стропам</span><span class="meta">4 источника</span></span>
+          <span class="right">12:40</span>
+        </button>
+
+        <div class="section"><span>Очередь</span><span class="right">0</span></div>
+        <div class="card" style="padding:14px; color:var(--d2); font-size:12.5px; line-height:1.45">Пусто. Новая задача встанет сюда, если агент занят.</div>
+      </section>
+
+      <!-- ================= ПРОФИЛЬ ================= -->
+      <section class="view" id="v-profile">
+        <div class="view-head">
+          <div>
+            <div class="kicker">Профиль</div>
+            <h1 class="h1">Максим</h1>
+          </div>
+        </div>
+
+        <div class="card" style="display:flex; align-items:center; gap:14px; margin-top:16px">
+          <div class="avatar" style="width:52px;height:52px;font-size:18px">М</div>
+          <div class="main">
+            <span class="title" style="font-size:15px">Личный план</span>
+            <span class="meta">Использовано 68% · до 1 дек</span>
+          </div>
+        </div>
+
+        <div class="glabel">Модель</div>
+        <div class="group">
+          <div class="grow"><div><div class="label">Провайдер</div></div><span class="val">deepseek</span></div>
+          <div class="grow"><div><div class="label">Модель</div></div><span class="val">deepseek-chat</span></div>
+          <div class="grow"><div><div class="label">Ключ</div><div class="hint">В Keychain</div></div><span class="val">•••• 7f3a</span></div>
+        </div>
+
+        <div class="glabel">Разрешения</div>
+        <div class="group">
+          <div class="grow"><div class="label">Файлы</div><div class="sw on" data-sw></div></div>
+          <div class="grow"><div class="label">Календарь и напоминания</div><div class="sw on" data-sw></div></div>
+          <div class="grow"><div class="label">Фото</div><div class="sw" data-sw></div></div>
+          <div class="grow"><div class="label">Микрофон</div><div class="sw on" data-sw></div></div>
+        </div>
+
+        <div class="glabel">Среда</div>
+        <div class="group">
+          <div class="grow"><div><div class="label">JS-движок</div><div class="hint">Скрипты и мини-аппы</div></div><div class="sw on" data-sw></div></div>
+          <div class="grow"><div><div class="label">Python</div><div class="hint">Следующая сборка</div></div><span class="chip">скоро</span></div>
+          <div class="grow"><div><div class="label">git</div><div class="hint">Только чтение</div></div><span class="chip">скоро</span></div>
+        </div>
+
+        <div class="glabel">Внешний вид</div>
+        <div class="group">
+          <div class="grow"><div><div class="label">Тема</div><div class="hint">Чёрный / белый</div></div><span class="val">чёрная</span></div>
+        </div>
+
+        <div class="glabel">Данные</div>
+        <div class="group">
+          <div class="grow"><div class="label">Хранилище</div><span class="val">1,2 ГБ</span></div>
+          <div class="grow"><div class="label">Экспорт сессий</div><span class="chev">›</span></div>
+        </div>
+
+        <div class="glabel">Приложение</div>
+        <div class="group">
+          <div class="grow"><div class="label">Версия</div><span class="val">0.1 (12)</span></div>
+          <div class="grow"><div class="label">Сборка</div><span class="val">GitHub Actions</span></div>
+        </div>
+      </section>
+
+      <!-- ================= ЧАТ ================= -->
+      <section class="view chat" id="v-chat">
+        <div class="chat-head">
+          <button class="icon-btn" data-back="project"><svg class="i"><use href="#i-back"/></svg></button>
+          <div class="chat-title">
+            <b>Рефакторинг парсера</b>
+            <span>deepseek-chat · локально</span>
+          </div>
+          <button class="icon-btn" data-toast="Файлы чата, экспорт"><svg class="i"><use href="#i-dots"/></svg></button>
+        </div>
+
+        <div class="chat-scroll" id="chatScroll">
+          <div class="plan">
+            <div class="plan-head"><span>План</span><span>2 / 3</span></div>
+            <div class="step done"><svg class="i"><use href="#i-check"/></svg><span>Найти, где ломается парсер</span></div>
+            <div class="step active"><span class="ring"></span><span>Переписать parseBlock()</span></div>
+            <div class="step"><span class="ring"></span><span>Прогнать тесты</span></div>
+          </div>
+
+          <div class="msg user">
+            <div class="bubble">Почини парсер — падает на вложенных тегах. И прогони тесты.</div>
+          </div>
+
+          <div class="tool"><svg class="i"><use href="#i-doc"/></svg><span>прочитал parser.js, tests/parser.test.js · 812 строк</span></div>
+
+          <div class="msg">
+            <div class="bubble">
+              <div class="who">Агент</div>
+              Нашёл три места. Причина одна: счётчик глубины сбрасывается при возврате из рекурсии.
+              Переписал <code>parseBlock()</code> — минус 40 строк, поведение то же.
+              <div class="diff">
+                <div class="del">- if (depth &gt; 0) return walk(node)</div>
+                <div class="add">+ return walk(node, depth + 1)</div>
+                <div>  }</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="approval" id="approval">
+            <b>Запустить тесты?</b>
+            <p>Агент сможет выполнять команды только внутри папки проекта.</p>
+            <span class="cmd">npm test</span>
+            <div class="btn-row">
+              <button class="btn primary" data-allow>Разрешить</button>
+              <button class="btn" data-deny>Отклонить</button>
+            </div>
+          </div>
+        </div>
+
+        <form class="composer" id="composer">
+          <div class="inputwrap">
+            <button type="button" class="mic-btn" data-toast="Голос: скажи задачу"><svg class="i"><use href="#i-mic"/></svg></button>
+            <input id="input" placeholder="Что сделать?" autocomplete="off" />
+            <button type="button" class="mic-btn" data-toast="Прикрепить файл"><svg class="i"><use href="#i-clip"/></svg></button>
+            <button class="send" type="submit"><svg class="i"><use href="#i-send"/></svg></button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ================= ФАЙЛЫ ================= -->
+      <section class="view" id="v-files">
+        <div class="view-head">
+          <button class="icon-btn" data-back="project" style="margin-left:-8px"><svg class="i"><use href="#i-back"/></svg></button>
+          <button class="round-btn" data-toast="Импорт из «Файлов» и iCloud"><svg class="i"><use href="#i-plus"/></svg></button>
+        </div>
+        <div class="kicker">Файлы</div>
+        <h1 class="h1">Рабочая папка</h1>
+        <div class="crumbs">/ <b>parser</b></div>
+
+        <button class="item" data-file="parser" data-name="parser.js">
+          <span class="ico"><svg class="i"><use href="#i-code"/></svg></span>
+          <span class="main"><span class="title">parser.js</span><span class="meta">12 КБ · изменён агентом</span></span>
+          <span class="right">12:31</span>
+        </button>
+
+        <button class="item" data-file="notes" data-name="notes.md">
+          <span class="ico"><svg class="i"><use href="#i-doc"/></svg></span>
+          <span class="main"><span class="title">notes.md</span><span class="meta">2 КБ · заметки по задаче</span></span>
+          <span class="right">11:48</span>
+        </button>
+
+        <button class="item" data-file="tests" data-name="parser.test.js">
+          <span class="ico"><svg class="i"><use href="#i-code"/></svg></span>
+          <span class="main"><span class="title">parser.test.js</span><span class="meta">4 КБ · 18 тестов</span></span>
+          <span class="right">12:30</span>
+        </button>
+
+        <div class="storage">
+          <div class="bar"><span style="width:24%"></span></div>
+          <p>1,2 ГБ из 5 ГБ · только на устройстве</p>
+        </div>
+      </section>
+
+    </div>
+
+    <nav class="tabbar" id="tabbar">
+      <button class="tab active" data-tab="chats">
+        <svg class="i"><use href="#i-chats"/></svg><span>Чаты</span>
+      </button>
+      <button class="tab" data-tab="apps">
+        <svg class="i"><use href="#i-apps"/></svg><span>Мини</span>
+      </button>
+      <button class="tab" data-tab="agents">
+        <svg class="i"><use href="#i-agents"/></svg><span>Агенты</span>
+      </button>
+      <button class="tab" data-tab="panel">
+        <svg class="i"><use href="#i-tasks"/></svg><span>Задачи</span>
+      </button>
+      <button class="tab" data-tab="profile">
+        <svg class="i"><use href="#i-profile"/></svg><span>Профиль</span>
+      </button>
+    </nav>
+
+    <div class="preview" id="preview">
+      <div class="sheet">
+        <div class="sheet-head">
+          <b id="pv-name">parser.js</b>
+          <button class="icon-btn" data-close><svg class="i"><use href="#i-back"/></svg></button>
+        </div>
+        <pre class="code" id="pv-code"></pre>
+        <div class="btn-row" style="margin-top:12px">
+          <button class="btn primary" data-ask>Спросить агента</button>
+          <button class="btn" data-toast="Редактор — в следующей сборке">Открыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+</main>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const tabbar = $('#tabbar');
+const toastEl = $('#toast');
+let toastTimer;
+
+const projects = {
+  parser: { title: 'Парсер', sub: '3 чата · 6 файлов', chats: [
+    { t: 'Рефакторинг парсера', s: 'Идёт · шаг 2 из 3', time: '12 мин' },
+    { t: 'Тесты падают на вложенных', s: 'Готово · 18 тестов', time: '2 ч' },
+    { t: 'Вынести парсер в модуль', s: 'Готово', time: 'вчера' }
+  ]},
+  home: { title: 'Дом', sub: '5 чатов · 9 файлов', chats: [
+    { t: 'Смета на электрику', s: 'Готово · 12 позиций', time: 'вчера' },
+    { t: 'Список покупок', s: 'Готово', time: 'вчера' },
+    { t: 'Фото щитка → схема', s: 'Готово · 1 изображение', time: '09:15' }
+  ]},
+  work: { title: 'Работа', sub: '2 чата · 3 файла', chats: [
+    { t: 'Письмо клиенту', s: 'Готово', time: '12 ноя' },
+    { t: 'Разбор PDF по стропам', s: 'Готово · 4 источника', time: '12 ноя' }
+  ]}
+};
+
+function toast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1900);
+}
+
+function renderProject(key) {
+  const p = projects[key];
+  if (!p) return;
+  $('#projectTitle').textContent = p.title;
+  $('#projectSub').textContent = p.sub;
+  $('#projectChats').innerHTML = p.chats.map(c => `
+    <button class="item" data-open="chat">
+      <span class="ico"><svg class="i"><use href="#i-chat"/></svg></span>
+      <span class="main"><span class="title">${c.t}</span><span class="meta">${c.s}</span></span>
+      <span class="right">${c.time}</span>
+    </button>`).join('');
+}
+
+let currentProject = 'parser';
+
+function show(name) {
+  $$('.view').forEach(v => v.classList.remove('active'));
+  const view = $('#v-' + name);
+  if (!view) return;
+  view.classList.add('active');
+  const isChat = name === 'chat';
+  tabbar.classList.toggle('hidden', isChat);
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  if (isChat) requestAnimationFrame(() => { const s = $('#chatScroll'); s.scrollTop = s.scrollHeight; });
+  else view.scrollTop = 0;
+}
+
+$$('.tab').forEach(t => t.addEventListener('click', () => show(t.dataset.tab)));
+$$('[data-open]').forEach(b => b.addEventListener('click', () => show(b.dataset.open)));
+$$('[data-back]').forEach(b => b.addEventListener('click', () => show(b.dataset.back)));
+$$('[data-toast]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); toast(b.dataset.toast); }));
+$$('[data-sw]').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+$$('[data-project]').forEach(b => b.addEventListener('click', () => {
+  currentProject = b.dataset.project;
+  renderProject(currentProject);
+  show('project');
+}));
+
+/* подтверждение */
+function allow() {
+  const box = $('#approval');
+  if (!box) return;
+  box.innerHTML = '<div class="ok"><svg class="i" style="width:15px;height:15px"><use href="#i-check"/></svg> Разрешено · запускаю</div>';
+  setTimeout(() => {
+    box.remove();
+    const scroll = $('#chatScroll');
+    const div = document.createElement('div');
+    div.className = 'msg';
+    div.innerHTML = '<div class="bubble"><div class="who">Агент</div>Готово: 18 тестов прошло, 0 упало. <code>parser.js</code> обновлён.</div>';
+    scroll.appendChild(div);
+    scroll.scrollTop = scroll.scrollHeight;
+    toast('Тесты: 18 / 18');
+  }, 1400);
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-allow]')) allow();
+  if (e.target.closest('[data-approve]')) { toast('Разрешено: npm test'); }
+  if (e.target.closest('[data-deny]')) {
+    const box = $('#approval');
+    if (box) { box.innerHTML = '<div class="ok" style="color:var(--d2)">Отклонено</div>'; setTimeout(() => box.remove(), 900); }
+    else toast('Отклонено');
+  }
+});
+
+/* отправка */
+$('#composer').addEventListener('submit', e => {
+  e.preventDefault();
+  const input = $('#input');
+  const text = input.value.trim();
+  if (!text) return;
+  const scroll = $('#chatScroll');
+  const user = document.createElement('div');
+  user.className = 'msg user';
+  user.innerHTML = '<div class="bubble"></div>';
+  user.querySelector('.bubble').textContent = text;
+  scroll.appendChild(user);
+  input.value = '';
+  scroll.scrollTop = scroll.scrollHeight;
+
+  const typing = document.createElement('div');
+  typing.className = 'tool';
+  typing.innerHTML = '<svg class="i"><use href="#i-agents"/></svg><span>думаю…</span>';
+  scroll.appendChild(typing);
+  scroll.scrollTop = scroll.scrollHeight;
+
+  setTimeout(() => {
+    typing.remove();
+    const reply = document.createElement('div');
+    reply.className = 'msg';
+    reply.innerHTML = '<div class="bubble"><div class="who">Агент</div>Принял. Сначала посмотрю, что уже есть в папке проекта, потом предложу шаги — подтвердишь.</div>';
+    scroll.appendChild(reply);
+    scroll.scrollTop = scroll.scrollHeight;
+  }, 1100);
+});
+
+/* файлы */
+const files = {
+  parser: [
+    '<span class="cm">// parser.js — разбор вложенных блоков</span>',
+    '<span class="kw">export function</span> parseBlock(node, depth = 0) {',
+    '  <span class="kw">if</span> (!node.children) <span class="kw">return</span> node;',
+    '  <span class="kw">return</span> walk(node, depth + 1);',
+    '}',
+    '',
+    '<span class="kw">function</span> walk(n, d) {',
+    '  <span class="kw">for</span> (<span class="kw">const</span> c <span class="kw">of</span> n.children) {',
+    '    <span class="kw">if</span> (c.type === <span class="str">"block"</span>) parseBlock(c, d);',
+    '  }',
+    '}'
+  ],
+  notes: ['<span class="cm"># Задача</span>', 'Парсер падает на вложенных тегах.', 'Тесты: 18, падало 3.'],
+  tests: ['<span class="cm">// 18 тестов</span>', 'test(<span class="str">"вложенные блоки"</span>, () => {', '  expect(parseBlock(tree)).toMatchSnapshot();', '});']
+};
+const pv = $('#preview');
+$$('[data-file]').forEach(row => row.addEventListener('click', () => {
+  const key = row.dataset.file;
+  if (!files[key]) { toast('Превью скоро'); return; }
+  $('#pv-name').textContent = row.dataset.name || key;
+  $('#pv-code').innerHTML = files[key].join('\n');
+  pv.classList.add('show');
+}));
+$$('[data-close]').forEach(b => b.addEventListener('click', () => pv.classList.remove('show')));
+pv.addEventListener('click', e => { if (e.target === pv) pv.classList.remove('show'); });
+$('[data-ask]').addEventListener('click', () => { pv.classList.remove('show'); show('chat'); toast('Файл прикреплён к чату'); });
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') pv.classList.remove('show'); });
+</script>
+</body>
+</html>
