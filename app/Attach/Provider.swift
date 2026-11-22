@@ -61,6 +61,18 @@ enum ProviderKind: String, CaseIterable, Codable, Identifiable {
         case .custom: return "Любой OpenAI-совместимый endpoint"
         }
     }
+
+    /// Куда отправить человека, если ключа ещё нет.
+    var consoleURL: URL? {
+        switch self {
+        case .deepseek: return URL(string: "https://platform.deepseek.com/api_keys")
+        case .openai: return URL(string: "https://platform.openai.com/api-keys")
+        case .anthropic: return URL(string: "https://console.anthropic.com/settings/keys")
+        case .gemini: return URL(string: "https://aistudio.google.com/apikey")
+        case .openrouter: return URL(string: "https://openrouter.ai/settings/keys")
+        case .custom: return nil
+        }
+    }
 }
 
 // MARK: - Проверка ключа

@@ -144,6 +144,21 @@ struct ModelSetupView: View {
             Text(models.provider.hint)
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.35))
+
+            if let url = models.provider.consoleURL {
+                Link(destination: url) {
+                    HStack(spacing: 5) {
+                        Text("Где взять ключ")
+                        Image(systemName: "arrow.up.right")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.white.opacity(0.06), in: Capsule())
+                }
+            }
         }
     }
 
