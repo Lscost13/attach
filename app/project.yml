@@ -29,7 +29,6 @@ targets:
         embed: true
       - sdk: ActivityKit.framework
       - package: ZIPFoundation
-        product: ZIPFoundation
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.manul.attach

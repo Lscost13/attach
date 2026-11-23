@@ -138,6 +138,10 @@ jobs:
         working-directory: app
         run: xcodegen generate
 
+      - name: Разрешить пакеты
+        working-directory: app
+        run: xcodebuild -resolvePackageDependencies -project Attach.xcodeproj -scheme Attach
+
       - name: Собрать без подписи
         working-directory: app
         run: |
