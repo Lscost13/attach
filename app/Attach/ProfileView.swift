@@ -8,7 +8,10 @@ struct ProfileView: View {
 
     @State private var showSetup = false
     @State private var showSettings = false
-    @State private var showLoginNote = false
+    @State private var safari: SafariTarget?
+    @State private var account: DSHAccount?
+    @State private var signingIn = false
+    @State private var loginError: String?
 
     @State private var storage: CoreStorage.Report?
     @State private var balance: String?
@@ -45,13 +48,13 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showSetup) { ModelSetupView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
-            .alert("Вход в DeepSeek", isPresented: $showLoginNote) {
-                Button("Понятно", role: .cancel) {}
-            } message: {
-                Text("Вход по аккаунту DeepSeek делает сам движок DSH. Подключим его следующим шагом — пока используй ключ.")
+            .sheet(item: $safari) { target in
+                SafariView(url: target.url)
+                    .ignoresSafeArea()
             }
             .task {
                 storage = await CoreStorage.measure()
+                account = await loadAccount()
                 if models.hasKey, models.provider == .deepseek {
                     balance = await models.fetchBalance()
                 }
@@ -134,7 +137,12 @@ struct ProfileView: View {
                     .frame(width: 7, height: 7)
             }
 
-            if models.hasKey {
+            if account?.signedIn == true {
+                Text("Вошёл в аккаунт DeepSeek — движок использует его модель.")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if models.hasKey {
                 HStack(spacing: 6) {
                     Text("ключ сохранён")
                         .font(.footnote)
@@ -148,9 +156,16 @@ struct ProfileView: View {
                     }
                 }
             } else {
-                Text("Добавь ключ провайдера — движок начнёт отвечать в чате.")
+                Text("Войди в DeepSeek или добавь ключ провайдера — движок начнёт отвечать в чате.")
                     .font(.footnote)
                     .foregroundStyle(.white.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let loginError {
+                Text(loginError)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.45))
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -168,9 +183,9 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
 
                 Button {
-                    showLoginNote = true
+                    startSignIn()
                 } label: {
-                    Text("Войти в DeepSeek")
+                    Text(account?.signedIn == true ? "Аккаунт DeepSeek" : (signingIn ? "Открываю…" : "Войти в DeepSeek"))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -182,6 +197,7 @@ struct ProfileView: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .disabled(signingIn || account?.signedIn == true)
             }
         }
         .padding(18)
@@ -280,6 +296,61 @@ struct ProfileView: View {
             Text(value)
                 .font(.footnote.monospaced())
                 .foregroundStyle(.white.opacity(0.85))
+        }
+    }
+
+    // MARK: Вход в DeepSeek
+
+    private func makeClient() async throws -> DSHClient {
+        guard let info = CoreRuntime.shared.info,
+              let base = URL(string: info.url)
+        else { throw DSHError.engine("ядро не запущено") }
+        let client = DSHClient(base: base)
+        try await client.handshake(token: info.token ?? "")
+        return client
+    }
+
+    private func loadAccount() async -> DSHAccount? {
+        try? await makeClient().accountState()
+    }
+
+    private func startSignIn() {
+        guard !signingIn else { return }
+        signingIn = true
+        loginError = nil
+
+        Task { @MainActor in
+            do {
+                let client = try await makeClient()
+                var state = try await client.accountState()
+
+                if !state.signedIn && state.authorizeURL == nil {
+                    state = try await client.startSignIn()
+                }
+
+                for _ in 0..<80 {
+                    account = state
+                    if state.signedIn { break }
+
+                    if safari == nil,
+                       let raw = state.authorizeURL,
+                       let url = URL(string: raw) {
+                        safari = SafariTarget(url: url)
+                    }
+
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    state = try await client.accountState()
+                }
+
+                account = state
+                safari = nil
+                if !state.signedIn {
+                    loginError = "Вход не завершился. Попробуй ещё раз."
+                }
+            } catch {
+                loginError = error.localizedDescription
+            }
+            signingIn = false
         }
     }
 }

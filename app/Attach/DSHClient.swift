@@ -133,6 +133,55 @@ final class DSHClient {
         let list = value as? [[String: Any]] ?? []
         return list.compactMap { $0["name"] as? String }
     }
+
+    // MARK: Аккаунт DeepSeek
+
+    private static var clientMetadata: [String: Any] {
+        [
+            "version": "0.1",
+            "locale": Locale.current.language.languageCode?.identifier ?? "ru",
+            "timezoneOffsetSeconds": TimeZone.current.secondsFromGMT(),
+        ]
+    }
+
+    func accountState() async throws -> DSHAccount {
+        let value = try await rpc("account/getState", args: [:])
+        let object = value as? [String: Any] ?? [:]
+        let attempt = object["attempt"] as? [String: Any]
+        let links = object["links"] as? [String: Any]
+        let status = object["status"] as? String ?? "signed-out"
+        return DSHAccount(
+            signedIn: status == "credential-stored",
+            authorizeURL: attempt?["authorizeUrl"] as? String,
+            phase: attempt?["phase"] as? String,
+            usageURL: links?["usageUrl"] as? String,
+            topUpURL: links?["topUpUrl"] as? String
+        )
+    }
+
+    /// Начинает вход в аккаунт DeepSeek и возвращает состояние с ссылкой на браузер.
+    func startSignIn() async throws -> DSHAccount {
+        let args: [String: Any] = [
+            "client": Self.clientMetadata,
+            "callbackOrigin": base.absoluteString,
+            "loginSource": "web",
+        ]
+        _ = try await rpc("account/startSignIn", args: args)
+        return try await accountState()
+    }
+
+    /// Кладёт секрет в хранилище DSH — так движок начинает им пользоваться.
+    func setCredential(ref: String, value: String) async throws {
+        _ = try await rpc("credentials/set", args: ["ref": ref, "value": value])
+    }
+}
+
+struct DSHAccount: Equatable {
+    var signedIn: Bool = false
+    var authorizeURL: String?
+    var phase: String?
+    var usageURL: String?
+    var topUpURL: String?
 }
 
 // MARK: - Разбор истории
