@@ -128,6 +128,14 @@ jobs:
             ls -la "$APP/PlugIns" || true
             exit 1
           fi
+          if [ -d "$APP/PlugIns/AttachWidgets.appex" ]; then
+            echo "--- extension Info.plist ---"
+            plutil -p "$APP/PlugIns/AttachWidgets.appex/Info.plist" || true
+            echo "--- extension signature ---"
+            codesign -dv "$APP/PlugIns/AttachWidgets.appex" 2>&1 | head -n 10 || true
+            echo "--- main signature ---"
+            codesign -dv "$APP" 2>&1 | head -n 10 || true
+          fi
           rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
