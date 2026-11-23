@@ -103,6 +103,11 @@ jobs:
           if [ -z "$APP" ]; then echo "::error::.app не найден"; exit 1; fi
           echo "app: $APP"
           du -sh "$APP"
+          if [ ! -d "$APP/PlugIns/AttachWidgets.appex" ]; then
+            echo "::error::расширение AttachWidgets не встроено в бандл"
+            ls -la "$APP/PlugIns" || true
+            exit 1
+          fi
           rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
