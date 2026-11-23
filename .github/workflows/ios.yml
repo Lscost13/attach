@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      widgets:
+        description: "Собрать с Live Activity"
+        type: boolean
+        default: true
+      bundle_id:
+        description: "Bundle ID (пусто — com.manul.attach)"
+        type: string
+        default: ""
 
 concurrency:
   group: ios-${{ github.ref }}
@@ -14,7 +23,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 60
     env:
-      BUNDLE_ID: ${{ secrets.BUNDLE_ID || 'com.manul.attach' }}
+      BUNDLE_ID: ${{ inputs.bundle_id != '' && inputs.bundle_id || secrets.BUNDLE_ID || 'com.manul.attach' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -67,7 +76,18 @@ jobs:
           if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 120 /tmp/engine.log; exit 1; fi
           grep "dsh web:" /tmp/engine.log | tail -n 1
           cat "$HOME/.attach/engine.json" || true
-          tail -n 20 /tmp/engine.log
+
+      - name: Конфигурация проекта
+        working-directory: app
+        env:
+          WIDGETS: ${{ inputs.widgets }}
+        run: |
+          if [ "$WIDGETS" = "false" ]; then
+            cp project-lite.yml project.yml
+            echo "WITH_WIDGETS=0" >> "$GITHUB_ENV"
+          else
+            echo "WITH_WIDGETS=1" >> "$GITHUB_ENV"
+          fi
 
       - name: Выбрать Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -103,7 +123,7 @@ jobs:
           if [ -z "$APP" ]; then echo "::error::.app не найден"; exit 1; fi
           echo "app: $APP"
           du -sh "$APP"
-          if [ ! -d "$APP/PlugIns/AttachWidgets.appex" ]; then
+          if [ "$WITH_WIDGETS" = "1" ] && [ ! -d "$APP/PlugIns/AttachWidgets.appex" ]; then
             echo "::error::расширение AttachWidgets не встроено в бандл"
             ls -la "$APP/PlugIns" || true
             exit 1
