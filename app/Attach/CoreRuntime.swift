@@ -38,6 +38,7 @@ final class CoreRuntime: ObservableObject {
     static let shared = CoreRuntime()
 
     @Published private(set) var phase: Phase = .idle
+    @Published private(set) var info: EngineInfo?
 
     private let port: Int = 3080
     private var booted = false
@@ -79,30 +80,37 @@ final class CoreRuntime: ObservableObject {
         }
     }
 
-    // MARK: - Health
+    // MARK: - Готовность
+
+    private var stateFile: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(".attach/engine.json")
+    }
 
     private func poll() {
         attempts += 1
-        guard attempts <= 60 else {
-            phase = .failed("ядро не ответило за 30 секунд")
+        guard attempts <= 240 else {
+            phase = .failed("DSH не поднялся за 2 минуты")
             return
         }
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/")!)
-        request.timeoutInterval = 1.5
-        request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        URLSession.shared.dataTask(with: request) { _, response, _ in
-            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
-            Task { @MainActor in
-                if (200..<400).contains(code) {
-                    self.phase = .ready
-                } else {
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    self.poll()
-                }
-            }
-        }.resume()
+        if let data = try? Data(contentsOf: stateFile),
+           let info = try? JSONDecoder().decode(EngineInfo.self, from: data) {
+            self.info = info
+            phase = .ready
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.poll()
+        }
     }
+}
+
+struct EngineInfo: Codable, Equatable {
+    let url: String
+    let token: String?
+    let node: String?
 }
 
 /// Строка состояния ядра — пока единственное, что видно на экране.

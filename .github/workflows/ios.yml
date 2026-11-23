@@ -42,6 +42,10 @@ jobs:
           npm ci --omit=dev --ignore-scripts --no-audit --no-fund
           du -sh node_modules
 
+      - name: Починить дерево пакетов
+        working-directory: app/Engine
+        run: node ../../scripts/clean-engine.mjs
+
       - name: Вычистить нативные бинарники
         working-directory: app/Engine
         run: |
@@ -54,11 +58,13 @@ jobs:
         run: |
           node Engine/main.js > /tmp/engine.log 2>&1 &
           ok=0
-          for i in $(seq 1 90); do
-            if curl -fsS -o /dev/null http://127.0.0.1:3080/ 2>/dev/null; then ok=1; echo "engine up after ${i}s"; break; fi
+          for i in $(seq 1 120); do
+            if grep -q "dsh web:" /tmp/engine.log 2>/dev/null; then ok=1; echo "engine up after ${i}s"; break; fi
             sleep 1
           done
-          if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 80 /tmp/engine.log; exit 1; fi
+          if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 120 /tmp/engine.log; exit 1; fi
+          grep "dsh web:" /tmp/engine.log | tail -n 1
+          cat "$HOME/.attach/engine.json" || true
           tail -n 20 /tmp/engine.log
 
       - name: Выбрать Xcode
