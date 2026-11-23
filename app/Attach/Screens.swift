@@ -11,23 +11,15 @@ enum Theme {
 // MARK: - Каркас экрана
 
 struct Screen<Content: View>: View {
-    let title: String
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                Text(title)
-                    .font(.largeTitle.weight(.semibold))
-                    .foregroundStyle(.white)
-
-                content()
-                    .padding(.top, 20)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.hPad)
-            .padding(.top, 10)
-            .padding(.bottom, 100)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Theme.hPad)
+                .padding(.top, 10)
+                .padding(.bottom, 100)
         }
         .scrollIndicators(.hidden)
         .background(Color.black)
@@ -83,7 +75,7 @@ struct ChatsView: View {
 
     var body: some View {
         NavigationStack {
-            Screen(title: "Проекты") {
+            Screen {
                 if store.projects.isEmpty {
                     EmptyProjects()
                 } else {
@@ -505,7 +497,7 @@ struct MessageBubble: View {
 
 struct AppsView: View {
     var body: some View {
-        Screen(title: "Свои штуки") {
+        Screen {
             VStack(spacing: 14) {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 28))
@@ -530,7 +522,7 @@ struct AppsView: View {
 
 struct AgentsView: View {
     var body: some View {
-        Screen(title: "Кто работает") {
+        Screen {
             VStack(spacing: 10) {
                 Row(icon: "sparkle", title: "Основной", subtitle: "Универсальный · deepseek-chat")
                 Row(icon: "chevron.left.forwardslash.chevron.right", title: "Кодер", subtitle: "Пишет и правит код")
@@ -542,7 +534,7 @@ struct AgentsView: View {
 
 struct TasksView: View {
     var body: some View {
-        Screen(title: "Задачи") {
+        Screen {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 8) {
                     Text("В работе 0")
@@ -562,49 +554,6 @@ struct TasksView: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-}
-
-struct ProfileView: View {
-    @EnvironmentObject private var models: ModelStore
-    @StateObject private var core = CoreRuntime.shared
-    @State private var showSetup = false
-
-    private var coreSubtitle: String {
-        switch core.phase {
-        case .ready: return "DSH · на связи"
-        case .starting: return "запускается…"
-        case .failed(let reason): return reason
-        case .idle: return "не запущено"
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            Screen(title: "Настройки") {
-                VStack(spacing: 10) {
-                    Button {
-                        showSetup = true
-                    } label: {
-                        Row(
-                            icon: "key",
-                            title: "Модель и ключ",
-                            subtitle: models.hasKey
-                                ? "\(models.provider.title) · \(models.model)"
-                                : "не подключено"
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Row(icon: "square.stack.3d.up", title: "Ядро", subtitle: coreSubtitle)
-                    Row(icon: "lock.shield", title: "Разрешения", subtitle: "Файлы, календарь, микрофон")
-                    Row(icon: "shippingbox", title: "Версия", subtitle: "0.1 · сборка из GitHub Actions")
-                }
-            }
-            .sheet(isPresented: $showSetup) {
-                ModelSetupView()
             }
         }
     }

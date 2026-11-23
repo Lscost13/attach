@@ -59,6 +59,30 @@ final class ModelStore: ObservableObject {
         check = .idle
     }
 
+    /// Баланс есть только у платформенного ключа DeepSeek.
+    func fetchBalance() async -> String? {
+        guard provider == .deepseek, let key = currentKey,
+              let url = URL(string: "https://api.deepseek.com/user/balance")
+        else { return nil }
+
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode == 200,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let infos = root["balance_infos"] as? [[String: Any]],
+              let first = infos.first
+        else { return nil }
+
+        let amount = first["total_balance"] as? String ?? "0"
+        let currency = first["currency"] as? String ?? ""
+        let symbol = currency == "CNY" ? "¥" : (currency == "USD" ? "$" : currency + " ")
+        return symbol + amount
+    }
+
     func runCheck() async {
         guard let key = currentKey else {
             check = .failed("Сначала сохрани ключ")

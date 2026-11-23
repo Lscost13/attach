@@ -1,0 +1,285 @@
+import SwiftUI
+
+struct ProfileView: View {
+    @EnvironmentObject private var models: ModelStore
+    @StateObject private var core = CoreRuntime.shared
+
+    @AppStorage("profileName") private var name = "Максим"
+
+    @State private var showSetup = false
+    @State private var showSettings = false
+    @State private var showLoginNote = false
+
+    @State private var storage: CoreStorage.Report?
+    @State private var balance: String?
+    @State private var latestBuild: String?
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 0) {
+                    banner
+                    header
+                    VStack(spacing: 12) {
+                        connectionCard
+                        coreCard
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                }
+                .padding(.bottom, 110)
+            }
+            .scrollIndicators(.hidden)
+            .background(Color.black)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 17, weight: .medium))
+                    }
+                    .tint(.white)
+                }
+                ToolbarItem(placement: .principal) { EmptyView() }
+            }
+            .sheet(isPresented: $showSetup) { ModelSetupView() }
+            .sheet(isPresented: $showSettings) { SettingsView() }
+            .alert("Вход в DeepSeek", isPresented: $showLoginNote) {
+                Button("Понятно", role: .cancel) {}
+            } message: {
+                Text("Вход по аккаунту DeepSeek делает сам движок DSH. Подключим его следующим шагом — пока используй ключ.")
+            }
+            .task {
+                storage = await CoreStorage.measure()
+                if models.hasKey, models.provider == .deepseek {
+                    balance = await models.fetchBalance()
+                }
+            }
+        }
+    }
+
+    // MARK: Баннер и шапка
+
+    private var banner: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(
+                colors: [.white.opacity(0.16), .white.opacity(0.03), .clear],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .frame(height: 168)
+            .overlay(alignment: .topLeading) {
+                Circle()
+                    .fill(.white.opacity(0.12))
+                    .frame(width: 220, height: 220)
+                    .blur(radius: 60)
+                    .offset(x: -40, y: -80)
+            }
+            .overlay(alignment: .topTrailing) {
+                Circle()
+                    .fill(.white.opacity(0.07))
+                    .frame(width: 180, height: 180)
+                    .blur(radius: 50)
+                    .offset(x: 40, y: -40)
+            }
+            .clipped()
+        }
+        .frame(height: 168)
+    }
+
+    private var header: some View {
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(Color.black)
+                    .frame(width: 96, height: 96)
+                Circle()
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+                    .frame(width: 96, height: 96)
+                Text(initials)
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+            .offset(y: -46)
+            .padding(.bottom, -40)
+
+            Text(name.isEmpty ? "Без имени" : name)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(.white)
+
+            Text(models.hasKey ? "\(models.provider.title) · \(models.model)" : "модель не подключена")
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.45))
+        }
+    }
+
+    private var initials: String {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard let first = trimmed.first else { return "?" }
+        return String(first).uppercased()
+    }
+
+    // MARK: Подключение
+
+    private var connectionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Подключение")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+                Circle()
+                    .fill(models.hasKey ? Color.white : Color.white.opacity(0.3))
+                    .frame(width: 7, height: 7)
+            }
+
+            if models.hasKey {
+                HStack(spacing: 6) {
+                    Text("ключ сохранён")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.5))
+                    if let balance {
+                        Text("·")
+                            .foregroundStyle(.white.opacity(0.3))
+                        Text("баланс \(balance)")
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.white)
+                    }
+                }
+            } else {
+                Text("Добавь ключ провайдера — движок начнёт отвечать в чате.")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    showSetup = true
+                } label: {
+                    Text(models.hasKey ? "Сменить ключ" : "API-ключ")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showLoginNote = true
+                } label: {
+                    Text("Войти в DeepSeek")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 13)
+                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(.white.opacity(0.12), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 22))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    // MARK: Ядро
+
+    private var coreCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Ядро")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Spacer()
+                Text(coreTitle)
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                Text(storage?.totalText ?? "…")
+                    .font(.system(size: 30, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("на диске")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.4))
+                Spacer()
+            }
+
+            VStack(spacing: 10) {
+                metricRow("движок", storage?.engineText ?? "…")
+                metricRow("данные и сессии", storage?.dataText ?? "…")
+                metricRow("Node", "24.20 · встроен")
+                metricRow("DSH", "0.2.2 · встроен")
+                metricRow("Python", "не подключён")
+            }
+
+            Divider().overlay(.white.opacity(0.1))
+
+            Button {
+                Task { latestBuild = await UpdateChecker.latestCommit() }
+            } label: {
+                HStack {
+                    Text("Проверить обновления")
+                        .font(.subheadline.weight(.medium))
+                    Spacer()
+                    if let latestBuild {
+                        Text(latestBuild)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(.white.opacity(0.5))
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                }
+                .foregroundStyle(.white)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+
+            Text("Node и Python компилируются в приложение — обновляются вместе со сборкой, отдельно скачать нельзя.")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.35))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 22))
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private var coreTitle: String {
+        switch core.phase {
+        case .ready: return "на связи"
+        case .starting: return "запускается…"
+        case .failed: return "не поднялось"
+        case .idle: return "не запущено"
+        }
+    }
+
+    private func metricRow(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.5))
+            Spacer()
+            Text(value)
+                .font(.footnote.monospaced())
+                .foregroundStyle(.white.opacity(0.85))
+        }
+    }
+}
