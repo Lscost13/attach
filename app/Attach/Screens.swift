@@ -418,6 +418,7 @@ struct ChatView: View {
         }
         draft = ""
         isSending = true
+        LiveActivityController.shared.start(chatTitle: chat?.title ?? "Чат")
 
         Task { @MainActor in
             do {
@@ -456,11 +457,15 @@ struct ChatView: View {
                     answer = "Движок не ответил"
                 }
                 store.append(ChatMessage(role: .assistant, text: answer), to: route)
+                LiveActivityController.shared.finish(
+                    status: reply.error == nil ? "готово" : "ошибка"
+                )
             } catch {
                 store.append(
                     ChatMessage(role: .assistant, text: "Ошибка: \(error.localizedDescription)"),
                     to: route
                 )
+                LiveActivityController.shared.finish(status: "ошибка")
             }
             isSending = false
         }

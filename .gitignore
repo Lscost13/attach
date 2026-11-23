@@ -11,3 +11,4 @@ app/ExportOptions.plist
 design/.shots/
 vendor/
 app/Engine/node_modules/
+app/Widgets/Info.plist

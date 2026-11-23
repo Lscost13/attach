@@ -16,6 +16,7 @@ targets:
     platform: iOS
     sources:
       - path: Attach
+      - path: Shared
       - path: Engine
         type: folder
         buildPhase: resources
@@ -23,6 +24,9 @@ targets:
       - framework: ../vendor/nodejs-mobile/NodeMobile.xcframework
         embed: true
         codeSign: true
+      - target: AttachWidgets
+        embed: true
+      - sdk: ActivityKit.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.manul.attach
@@ -39,6 +43,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UIUserInterfaceStyle: Dark
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         UILaunchScreen:
@@ -47,3 +53,29 @@ targets:
           - UIInterfaceOrientationPortrait
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
+
+  AttachWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: Shared
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.manul.attach.widgets
+        PRODUCT_NAME: AttachWidgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_EMIT_LOC_STRINGS: NO
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Attach
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
