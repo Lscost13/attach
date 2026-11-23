@@ -39,6 +39,7 @@ struct ModelSetupView: View {
                 .padding(.bottom, 40)
             }
             .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.immediately)
             .background(Color.black)
             .navigationTitle(isOnboarding ? "Подключение" : "Модель")
             .navigationBarTitleDisplayMode(.inline)

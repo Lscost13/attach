@@ -22,6 +22,7 @@ struct Screen<Content: View>: View {
                 .padding(.bottom, 100)
         }
         .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.black)
     }
 }
@@ -345,6 +346,7 @@ struct ChatView: View {
                         }
                     }
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
 
             if isSending {
@@ -371,6 +373,12 @@ struct ChatView: View {
                     Image(systemName: "ellipsis")
                 }
                 .tint(.white)
+            }
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Готово") { focused = false }
             }
         }
     }

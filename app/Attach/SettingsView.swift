@@ -4,6 +4,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("profileName") private var name = "Максим"
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -20,6 +21,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.white)
                                 .multilineTextAlignment(.trailing)
                                 .textInputAutocapitalization(.words)
+                                .focused($nameFocused)
                         }
                     }
 
@@ -46,6 +48,7 @@ struct SettingsView: View {
                 .padding(.bottom, 40)
             }
             .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
             .background(Color.black)
             .navigationTitle("Настройки")
             .navigationBarTitleDisplayMode(.inline)
@@ -53,6 +56,10 @@ struct SettingsView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Готово") { dismiss() }
                         .tint(.white)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Готово") { nameFocused = false }
                 }
             }
         }
