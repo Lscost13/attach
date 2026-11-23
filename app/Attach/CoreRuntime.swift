@@ -55,14 +55,10 @@ final class CoreRuntime: ObservableObject {
     // MARK: - Node
 
     private func startNode() {
-        guard let resources = Bundle.main.resourceURL else {
-            phase = .failed("нет ресурсов бандла")
-            return
-        }
-        let engine = resources.appendingPathComponent("Engine", isDirectory: true)
+        let engine = EngineInstaller.shared.engineDirectory
         let entry = engine.appendingPathComponent("main.js")
         guard FileManager.default.fileExists(atPath: entry.path) else {
-            phase = .failed("в бандле нет Engine/main.js")
+            phase = .failed("движок не скачан")
             return
         }
 

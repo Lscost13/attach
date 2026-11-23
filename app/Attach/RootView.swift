@@ -6,35 +6,52 @@ enum Tab: Hashable {
 
 struct RootView: View {
     @EnvironmentObject private var models: ModelStore
+    @StateObject private var installer = EngineInstaller.shared
     @State private var tab: Tab = .chats
     @State private var showSetup = false
 
+    private var engineReady: Bool { installer.phase == .ready }
+
     var body: some View {
-        TabView(selection: $tab) {
-            ChatsView()
-                .tabItem { Label("Чаты", systemImage: "folder") }
-                .tag(Tab.chats)
+        ZStack {
+            TabView(selection: $tab) {
+                ChatsView()
+                    .tabItem { Label("Чаты", systemImage: "folder") }
+                    .tag(Tab.chats)
 
-            AppsView()
-                .tabItem { Label("Мини", systemImage: "square.grid.2x2") }
-                .tag(Tab.apps)
+                AppsView()
+                    .tabItem { Label("Мини", systemImage: "square.grid.2x2") }
+                    .tag(Tab.apps)
 
-            AgentsView()
-                .tabItem { Label("Агенты", systemImage: "sparkle") }
-                .tag(Tab.agents)
+                AgentsView()
+                    .tabItem { Label("Агенты", systemImage: "sparkle") }
+                    .tag(Tab.agents)
 
-            TasksView()
-                .tabItem { Label("Задачи", systemImage: "checklist") }
-                .tag(Tab.tasks)
+                TasksView()
+                    .tabItem { Label("Задачи", systemImage: "checklist") }
+                    .tag(Tab.tasks)
 
-            ProfileView()
-                .tabItem { Label("Профиль", systemImage: "person") }
-                .tag(Tab.profile)
+                ProfileView()
+                    .tabItem { Label("Профиль", systemImage: "person") }
+                    .tag(Tab.profile)
+            }
+            .opacity(engineReady ? 1 : 0)
+
+            if !engineReady {
+                EngineSetupView(installer: installer)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: engineReady)
+        .onChange(of: engineReady) { _, ready in
+            guard ready else { return }
+            CoreRuntime.shared.bootIfNeeded()
+            if !models.hasKey { showSetup = true }
         }
         .onAppear {
-            CoreRuntime.shared.bootIfNeeded()
-            if !models.hasKey {
-                showSetup = true
+            if engineReady {
+                CoreRuntime.shared.bootIfNeeded()
+                if !models.hasKey { showSetup = true }
             }
         }
         .fullScreenCover(isPresented: $showSetup) {

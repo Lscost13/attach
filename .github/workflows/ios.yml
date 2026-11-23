@@ -87,6 +87,27 @@ jobs:
           if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 120 /tmp/engine.log; exit 1; fi
           grep "dsh web:" /tmp/engine.log | tail -n 1
 
+      - name: Упаковать движок
+        if: inputs.engine != 'false'
+        working-directory: app/Engine
+        run: |
+          rm -f ../engine.zip
+          zip -qry ../engine.zip .
+          du -h ../engine.zip
+
+      - name: Опубликовать движок
+        if: inputs.engine != 'false'
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="engine-latest"
+          gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+          gh release create "$tag" engine.zip \
+            --title "Движок Attach" \
+            --notes "Архив движка DSH для первого запуска. Пересобирается каждой сборкой." \
+            --repo "${{ github.repository }}"
+
       - name: Конфигурация проекта
         working-directory: app
         env:
