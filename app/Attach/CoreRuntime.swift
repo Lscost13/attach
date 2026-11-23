@@ -73,10 +73,16 @@ final class CoreRuntime: ObservableObject {
         setenv("ATTACH_PORT", String(port), 1)
 
         let argv0 = "node"
-        let argv1 = entry.path
+        let argv1 = "--expose-internals"
+        let argv2 = entry.path
         DispatchQueue.global(qos: .userInitiated).async {
-            var argv: [UnsafeMutablePointer<CChar>?] = [strdup(argv0), strdup(argv1), nil]
-            _ = node_start(2, &argv)
+            var argv: [UnsafeMutablePointer<CChar>?] = [
+                strdup(argv0),
+                strdup(argv1),
+                strdup(argv2),
+                nil,
+            ]
+            _ = node_start(3, &argv)
         }
     }
 

@@ -44,7 +44,9 @@ jobs:
 
       - name: Починить дерево пакетов
         working-directory: app/Engine
-        run: node ../../scripts/clean-engine.mjs
+        run: |
+          node ../../scripts/clean-engine.mjs
+          node ../../scripts/patch-engine.mjs .
 
       - name: Вычистить нативные бинарники
         working-directory: app/Engine
@@ -56,7 +58,7 @@ jobs:
       - name: Проверить запуск ядра
         working-directory: app
         run: |
-          node Engine/main.js > /tmp/engine.log 2>&1 &
+          node --expose-internals Engine/main.js > /tmp/engine.log 2>&1 &
           ok=0
           for i in $(seq 1 120); do
             if grep -q "dsh web:" /tmp/engine.log 2>/dev/null; then ok=1; echo "engine up after ${i}s"; break; fi
