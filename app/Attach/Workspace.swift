@@ -18,6 +18,8 @@ struct Chat: Identifiable, Codable, Hashable {
     var createdAt = Date()
     var updatedAt = Date()
     var messages: [ChatMessage] = []
+    /// Сессия внутри DSH. Появляется при первом сообщении.
+    var dshSessionId: String? = nil
 }
 
 struct Project: Identifiable, Codable, Hashable {
@@ -92,8 +94,7 @@ final class WorkspaceStore: ObservableObject {
         save()
     }
 
-    func append(_ message: ChatMessage, to route: ChatRoute) {
-        guard let pIndex = projects.firstIndex(where: { $0.id == route.projectID }),
+    func append(_ message: ChatMessage, to route: ChatRoute) {        guard let pIndex = projects.firstIndex(where: { $0.id == route.projectID }),
               let cIndex = projects[pIndex].chats.firstIndex(where: { $0.id == route.chatID })
         else { return }
 
@@ -105,6 +106,20 @@ final class WorkspaceStore: ObservableObject {
             let title = message.text.trimmingCharacters(in: .whitespacesAndNewlines)
             projects[pIndex].chats[cIndex].title = String(title.prefix(40))
         }
+        save()
+    }
+
+    // MARK: DSH
+
+    func engineSession(_ route: ChatRoute) -> String? {
+        chat(route)?.dshSessionId
+    }
+
+    func setEngineSession(_ id: String, for route: ChatRoute) {
+        guard let pIndex = projects.firstIndex(where: { $0.id == route.projectID }),
+              let cIndex = projects[pIndex].chats.firstIndex(where: { $0.id == route.chatID })
+        else { return }
+        projects[pIndex].chats[cIndex].dshSessionId = id
         save()
     }
 

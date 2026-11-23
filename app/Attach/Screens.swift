@@ -317,6 +317,7 @@ struct ChatView: View {
 
     private var chat: Chat? { store.chat(route) }
     private var messages: [ChatMessage] { chat?.messages ?? [] }
+    @State private var isSending = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -328,7 +329,7 @@ struct ChatView: View {
                                 Text("Чат создан")
                                     .font(.headline)
                                     .foregroundStyle(.white)
-                                Text("Напиши первое сообщение. Модель пока не подключена к чату — ответы появятся, когда проведём ключ в ядро.")
+                                Text("Напиши первое сообщение — его примет движок на телефоне.")
                                     .font(.subheadline)
                                     .foregroundStyle(.white.opacity(0.5))
                             }
@@ -352,6 +353,16 @@ struct ChatView: View {
                         }
                     }
                 }
+            }
+
+            if isSending {
+                HStack(spacing: 8) {
+                    ProgressView().tint(.white).scaleEffect(0.8)
+                    Text("DSH работает…")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                .padding(.bottom, 6)
             }
 
             composer
@@ -408,11 +419,59 @@ struct ChatView: View {
 
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty, !isSending else { return }
+
         withAnimation(.snappy(duration: 0.25)) {
             store.append(ChatMessage(role: .user, text: text), to: route)
         }
         draft = ""
+        isSending = true
+
+        Task { @MainActor in
+            do {
+                guard let info = CoreRuntime.shared.info,
+                      let baseURL = URL(string: info.url)
+                else { throw DSHError.engine("ядро не запущено") }
+
+                let client = DSHClient(base: baseURL)
+                try await client.handshake(token: info.token ?? "")
+
+                let sessionId: String
+                if let existing = store.engineSession(route) {
+                    sessionId = existing
+                } else {
+                    sessionId = try await client.createSession()
+                    store.setEngineSession(sessionId, for: route)
+                }
+
+                let before = (try? await client.page(sessionId: sessionId).count) ?? 0
+                try await client.prompt(sessionId: sessionId, text: text)
+
+                var reply = DSHReply()
+                for _ in 0..<120 {
+                    try await Task.sleep(nanoseconds: 800_000_000)
+                    let records = try await client.page(sessionId: sessionId)
+                    reply = DSHParse.lastTurn(from: Array(records.dropFirst(before)))
+                    if reply.finished { break }
+                }
+
+                let answer: String
+                if let error = reply.error {
+                    answer = "Ошибка: \(error)"
+                } else if !reply.text.isEmpty {
+                    answer = reply.text
+                } else {
+                    answer = "Движок не ответил"
+                }
+                store.append(ChatMessage(role: .assistant, text: answer), to: route)
+            } catch {
+                store.append(
+                    ChatMessage(role: .assistant, text: "Ошибка: \(error.localizedDescription)"),
+                    to: route
+                )
+            }
+            isSending = false
+        }
     }
 }
 
