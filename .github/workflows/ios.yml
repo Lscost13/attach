@@ -26,6 +26,8 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       BUNDLE_ID: ${{ inputs.bundle_id != '' && inputs.bundle_id || secrets.BUNDLE_ID || 'com.manul.attach' }}
 
@@ -153,6 +155,19 @@ jobs:
           ditto -c -k --norsrc --keepParent Payload Attach.ipa
           unzip -t Attach.ipa > /dev/null && echo "ipa: архив целый"
           du -h Attach.ipa
+
+      - name: Опубликовать IPA
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${{ github.run_number }}"
+          gh release create "$tag" Attach.ipa \
+            --title "Attach · сборка ${{ github.run_number }}" \
+            --notes "Прямая ссылка на IPA, без zip и распаковки." \
+            --repo "${{ github.repository }}"
+          echo "https://github.com/${{ github.repository }}/releases/download/$tag/Attach.ipa"
 
       - name: Артефакт
         uses: actions/upload-artifact@v4
