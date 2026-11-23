@@ -139,7 +139,10 @@ jobs:
           rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
-          zip -qry Attach.ipa Payload
+          # Эппловский формат архива: без resource fork и лишних атрибутов —
+          # сторонние распаковщики на iOS такое читают надёжнее.
+          ditto -c -k --norsrc --keepParent Payload Attach.ipa
+          unzip -t Attach.ipa > /dev/null && echo "ipa: архив целый"
           du -h Attach.ipa
 
       - name: Артефакт
