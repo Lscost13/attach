@@ -9,6 +9,10 @@ on:
         description: "Собрать с Live Activity"
         type: boolean
         default: true
+      engine:
+        description: "Включить движок DSH (выкл — лёгкая сборка для теста)"
+        type: boolean
+        default: true
       bundle_id:
         description: "Bundle ID (пусто — com.manul.attach)"
         type: string
@@ -40,24 +44,28 @@ jobs:
           ./scripts/fetch-node.sh
 
       - name: Кэш ядра (npm)
+        if: inputs.engine != 'false'
         uses: actions/cache@v4
         with:
           path: app/Engine/node_modules
           key: dsh-0.2.2-rc.5-${{ hashFiles('app/Engine/package-lock.json') }}
 
       - name: Установить ядро
+        if: inputs.engine != 'false'
         working-directory: app/Engine
         run: |
           npm ci --omit=dev --ignore-scripts --no-audit --no-fund
           du -sh node_modules
 
       - name: Починить дерево пакетов
+        if: inputs.engine != 'false'
         working-directory: app/Engine
         run: |
           node ../../scripts/clean-engine.mjs
           node ../../scripts/patch-engine.mjs .
 
       - name: Вычистить нативные бинарники
+        if: inputs.engine != 'false'
         working-directory: app/Engine
         run: |
           find node_modules -type f \( -name '*.node' -o -name '*.dylib' -o -name '*.so' -o -name '*.so.*' -o -name '*.a' -o -name '*.exe' -o -name '*.dll' \) -delete
@@ -65,6 +73,7 @@ jobs:
           du -sh node_modules
 
       - name: Проверить запуск ядра
+        if: inputs.engine != 'false'
         working-directory: app
         run: |
           node --expose-internals Engine/main.js > /tmp/engine.log 2>&1 &
@@ -75,18 +84,23 @@ jobs:
           done
           if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 120 /tmp/engine.log; exit 1; fi
           grep "dsh web:" /tmp/engine.log | tail -n 1
-          cat "$HOME/.attach/engine.json" || true
 
       - name: Конфигурация проекта
         working-directory: app
         env:
           WIDGETS: ${{ inputs.widgets }}
+          ENGINE: ${{ inputs.engine }}
         run: |
           if [ "$WIDGETS" = "false" ]; then
             cp project-lite.yml project.yml
             echo "WITH_WIDGETS=0" >> "$GITHUB_ENV"
           else
             echo "WITH_WIDGETS=1" >> "$GITHUB_ENV"
+          fi
+          if [ "$ENGINE" = "false" ]; then
+            echo "WITH_ENGINE=0" >> "$GITHUB_ENV"
+          else
+            echo "WITH_ENGINE=1" >> "$GITHUB_ENV"
           fi
 
       - name: Выбрать Xcode
@@ -129,18 +143,13 @@ jobs:
             exit 1
           fi
           if [ -d "$APP/PlugIns/AttachWidgets.appex" ]; then
-            echo "--- extension Info.plist ---"
-            plutil -p "$APP/PlugIns/AttachWidgets.appex/Info.plist" || true
             echo "--- extension signature ---"
-            codesign -dv "$APP/PlugIns/AttachWidgets.appex" 2>&1 | head -n 10 || true
-            echo "--- main signature ---"
-            codesign -dv "$APP" 2>&1 | head -n 10 || true
+            codesign -dv "$APP/PlugIns/AttachWidgets.appex" 2>&1 | head -n 6 || true
           fi
           rm -rf Payload Attach.ipa
           mkdir Payload
           cp -R "$APP" Payload/
-          # Эппловский формат архива: без resource fork и лишних атрибутов —
-          # сторонние распаковщики на iOS такое читают надёжнее.
+          # Эппловский формат архива: без resource fork и лишних атрибутов.
           ditto -c -k --norsrc --keepParent Payload Attach.ipa
           unzip -t Attach.ipa > /dev/null && echo "ipa: архив целый"
           du -h Attach.ipa
