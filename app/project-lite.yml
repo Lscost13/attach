@@ -17,9 +17,6 @@ targets:
     sources:
       - path: Attach
       - path: Shared
-      - path: Engine
-        type: folder
-        buildPhase: resources
     dependencies:
       - framework: ../vendor/nodejs-mobile/NodeMobile.xcframework
         embed: true
