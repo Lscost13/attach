@@ -86,7 +86,7 @@ enum EngineError: LocalizedError {
         case .noSpace(let free):
             return "Мало места: свободно \(free / 1_048_576) МБ, нужно около 900."
         case .noEntry:
-            return "В архиве нет main.js — движок скачался неправильно."
+            return "В архиве нет самого DSH — движок скачался неправильно."
         case .badArchive(let name):
             return "Не удалось распаковать \(name)."
         }
@@ -110,6 +110,10 @@ final class EngineInstaller: ObservableObject {
     @Published private(set) var phase: Phase = .checking
     @Published private(set) var progress: Double = 0
     @Published private(set) var receivedText: String = ""
+    @Published private(set) var unpackProgress: Double = 0
+    @Published private(set) var unpackText: String = ""
+
+    private var running = false
 
     private let remote = URL(
         string: "https://github.com/Lscost13/attach/releases/download/engine-latest/engine.bin"
@@ -120,15 +124,25 @@ final class EngineInstaller: ObservableObject {
             .appendingPathComponent("engine", isDirectory: true)
     }
 
-    var entryURL: URL {
-        engineDirectory.appendingPathComponent("main.js")
+    /// Готовность — это сам DSH внутри движка, а не файл скрипта:
+    /// скрипт запуска теперь в приложении.
+    var dshPackage: URL {
+        engineDirectory
+            .appendingPathComponent("node_modules", isDirectory: true)
+            .appendingPathComponent("@deepseek-ai", isDirectory: true)
+            .appendingPathComponent("dsh", isDirectory: true)
+            .appendingPathComponent("package.json")
     }
 
     var isReady: Bool {
-        FileManager.default.fileExists(atPath: entryURL.path)
+        FileManager.default.fileExists(atPath: dshPackage.path)
     }
 
     func prepareIfNeeded() async {
+        guard !running else { return }
+        running = true
+        defer { running = false }
+
         if isReady {
             phase = .ready
             return
@@ -137,6 +151,7 @@ final class EngineInstaller: ObservableObject {
         progress = 0
         receivedText = ""
         phase = .downloading
+        Diag.log("engine: качаем \(remote.absoluteString)")
 
         do {
             try ensureFreeSpace()
@@ -153,22 +168,41 @@ final class EngineInstaller: ObservableObject {
 
             let attributes = try? FileManager.default.attributesOfItem(atPath: temp.path)
             let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+            Diag.log("engine: скачано \(size) байт")
             guard size > 1_000_000 else { throw EngineError.tooSmall(size) }
 
             phase = .unpacking
+            unpackProgress = 0
+            unpackText = "0%"
             try? FileManager.default.removeItem(at: engineDirectory)
 
+            let archive = temp
+            let destination = engineDirectory
             do {
-                try EngineArchive.unpack(archive: temp, to: engineDirectory)
+                // Распаковка — самая долгая часть: 70 тысяч файлов.
+                // Только не на главном потоке, иначе интерфейс умирает.
+                try await Task.detached(priority: .userInitiated) {
+                    try EngineArchive.unpack(archive: archive, to: destination) { done, total in
+                        guard total > 0 else { return }
+                        let value = Double(done) / Double(total)
+                        Task { @MainActor in
+                            EngineInstaller.shared.unpackProgress = value
+                            EngineInstaller.shared.unpackText = "\(Int(value * 100))%"
+                        }
+                    }
+                }.value
             } catch {
+                Diag.log("engine: распаковка не удалась — \(error.localizedDescription)")
                 throw EngineError.badArchive(error.localizedDescription)
             }
             try? FileManager.default.removeItem(at: temp)
 
             guard isReady else { throw EngineError.noEntry }
             phase = .ready
+            Diag.log("engine: распакован в \(engineDirectory.path)")
         } catch {
             phase = .failed(Self.message(for: error))
+            Diag.log("engine: ошибка — \(Self.message(for: error))")
         }
     }
 
@@ -222,6 +256,13 @@ struct EngineSetupView: View {
                     .tint(.white)
                     .frame(width: 220)
                 Text(installer.receivedText)
+                    .font(.footnote.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.45))
+            case .unpacking:
+                ProgressView(value: installer.unpackProgress)
+                    .tint(.white)
+                    .frame(width: 220)
+                Text(installer.unpackText)
                     .font(.footnote.monospacedDigit())
                     .foregroundStyle(.white.opacity(0.45))
             case .failed(let message):

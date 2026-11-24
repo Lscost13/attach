@@ -287,6 +287,19 @@ struct ModelSetupView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            if isOnboarding {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Пропустить — настрою позже")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.45))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.top, 4)
     }

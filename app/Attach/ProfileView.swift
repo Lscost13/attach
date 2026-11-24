@@ -16,6 +16,8 @@ struct ProfileView: View {
     @State private var storage: CoreStorage.Report?
     @State private var balance: String?
     @State private var latestBuild: String?
+    @State private var showJournal = false
+    @State private var crashed = false
 
     var body: some View {
         NavigationStack {
@@ -48,11 +50,13 @@ struct ProfileView: View {
             }
             .sheet(isPresented: $showSetup) { ModelSetupView() }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showJournal) { DiagnosticsView() }
             .sheet(item: $safari) { target in
                 SafariView(url: target.url)
                     .ignoresSafeArea()
             }
             .task {
+                crashed = Diag.hasCrash
                 storage = await CoreStorage.measure()
                 account = await loadAccount()
                 if models.hasKey, models.provider == .deepseek {
@@ -258,6 +262,29 @@ struct ProfileView: View {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 13, weight: .semibold))
                     }
+                }
+                .foregroundStyle(.white)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+
+            Divider().overlay(.white.opacity(0.1))
+
+            Button {
+                showJournal = true
+            } label: {
+                HStack(spacing: 8) {
+                    Text("Журнал")
+                        .font(.subheadline.weight(.medium))
+                    if crashed {
+                        Text("было падение")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.3))
                 }
                 .foregroundStyle(.white)
                 .padding(.vertical, 6)

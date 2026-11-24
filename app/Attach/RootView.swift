@@ -9,6 +9,8 @@ struct RootView: View {
     @StateObject private var installer = EngineInstaller.shared
     @State private var tab: Tab = .chats
     @State private var showSetup = false
+    @State private var showJournal = false
+    @State private var hasCrash = false
 
     private var engineReady: Bool { installer.phase == .ready }
 
@@ -41,6 +43,17 @@ struct RootView: View {
                 EngineSetupView(installer: installer)
                     .transition(.opacity)
             }
+
+            if engineReady && hasCrash {
+                VStack {
+                    Spacer()
+                    CrashNotice(
+                        onOpen: { showJournal = true },
+                        onClose: { hasCrash = false }
+                    )
+                }
+                .transition(.opacity)
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: engineReady)
         .onChange(of: engineReady) { _, ready in
@@ -49,6 +62,7 @@ struct RootView: View {
             if !models.hasKey { showSetup = true }
         }
         .onAppear {
+            hasCrash = Diag.hasCrash
             if engineReady {
                 CoreRuntime.shared.bootIfNeeded()
                 if !models.hasKey { showSetup = true }
@@ -56,6 +70,9 @@ struct RootView: View {
         }
         .fullScreenCover(isPresented: $showSetup) {
             ModelSetupView(isOnboarding: true)
+        }
+        .sheet(isPresented: $showJournal) {
+            DiagnosticsView()
         }
     }
 }

@@ -126,6 +126,12 @@ jobs:
             echo "WITH_ENGINE=1" >> "$GITHUB_ENV"
           fi
 
+      - name: Скрипт запуска ядра в бандл
+        working-directory: app
+        run: |
+          cp Engine/main.js Attach/engine-main.js
+          ls -l Attach/engine-main.js
+
       - name: Выбрать Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:

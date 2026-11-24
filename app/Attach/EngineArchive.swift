@@ -20,7 +20,11 @@ enum EngineArchive {
         }
     }
 
-    static func unpack(archive: URL, to destination: URL) throws {
+    static func unpack(
+        archive: URL,
+        to destination: URL,
+        progress: ((Int, Int) -> Void)? = nil
+    ) throws {
         let data = try Data(contentsOf: archive, options: .mappedIfSafe)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
 
@@ -33,8 +37,13 @@ enum EngineArchive {
             let count = Int(readU32(raw, 6))
             var offset = 10
             let base = raw.baseAddress!
+            var index = 0
 
             for _ in 0..<count {
+                index += 1
+                if index % 200 == 0 {
+                    progress?(index, count)
+                }
                 guard offset + 2 <= raw.count else { throw ArchiveError.truncated }
                 let nameLength = Int(readU16(raw, offset))
                 offset += 2
@@ -86,6 +95,8 @@ enum EngineArchive {
                 try output.write(to: fileURL)
                 offset += compressedSize
             }
+
+            progress?(count, count)
         }
     }
 

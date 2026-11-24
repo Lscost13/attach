@@ -56,30 +56,55 @@ final class CoreRuntime: ObservableObject {
 
     private func startNode() {
         let engine = EngineInstaller.shared.engineDirectory
-        let entry = engine.appendingPathComponent("main.js")
-        guard FileManager.default.fileExists(atPath: entry.path) else {
+        guard EngineInstaller.shared.isReady else {
             phase = .failed("движок не скачан")
             return
         }
 
+        // Скрипт запуска лежит в приложении — его можно обновить, не трогая движок.
+        // Если в бандле его почему-то нет, берём копию из скачанного движка.
+        let legacy = engine.appendingPathComponent("main.js")
+        let bundled = Bundle.main.url(forResource: "engine-main", withExtension: "js")
+        let fallback = FileManager.default.fileExists(atPath: legacy.path) ? legacy : nil
+        guard let script = bundled ?? fallback else {
+            phase = .failed("в сборке нет скрипта запуска")
+            Diag.log("engine: нет engine-main.js в бандле")
+            return
+        }
+
         let home = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        // DSH считает рабочим каталогом текущую папку: пусть это будет пустая
+        // папка, а не Documents, где лежит весь движок из 70 тысяч файлов.
+        let work = home.appendingPathComponent("work", isDirectory: true)
+        try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+
         setenv("HOME", home.path, 1)
         setenv("ATTACH_ENGINE", engine.path, 1)
-        setenv("ATTACH_WORKDIR", home.path, 1)
+        setenv("ATTACH_WORKDIR", work.path, 1)
         setenv("ATTACH_PORT", String(port), 1)
 
-        let argv0 = "node"
-        let argv1 = "--expose-internals"
-        let argv2 = entry.path
-        DispatchQueue.global(qos: .userInitiated).async {
-            var argv: [UnsafeMutablePointer<CChar>?] = [
-                strdup(argv0),
-                strdup(argv1),
-                strdup(argv2),
-                nil,
-            ]
-            _ = node_start(3, &argv)
+        Diag.log("engine: boot \(script.path) → \(engine.path)")
+
+        // Node можно запустить только один раз, и ему нужен свой поток:
+        // у очереди GCD стек 512 КБ, а V8 берёт предел стека от потока
+        // и падает на глубоком графе модулей DSH.
+        let thread = Thread {
+            let code = NodeLauncher.run(["node", "--expose-internals", script.path])
+            Diag.log("engine: node_start вернул \(code)")
+            Task { @MainActor in
+                CoreRuntime.shared.nodeExited(code)
+            }
         }
+        thread.name = "attach-node"
+        thread.stackSize = 16 * 1024 * 1024
+        thread.qualityOfService = .userInitiated
+        thread.start()
+    }
+
+    fileprivate func nodeExited(_ code: Int32) {
+        if case .failed = phase { return }
+        phase = .failed("движок остановился (код \(code)). Перезапусти приложение — подробности в журнале.")
+        Diag.log("engine: Node завершился с кодом \(code)")
     }
 
     // MARK: - Готовность
@@ -92,7 +117,8 @@ final class CoreRuntime: ObservableObject {
     private func poll() {
         attempts += 1
         guard attempts <= 240 else {
-            phase = .failed("DSH не поднялся за 2 минуты")
+            phase = .failed("DSH не поднялся за 2 минуты. Подробности — в журнале.")
+            Diag.log("engine: таймаут ожидания engine.json")
             return
         }
 
@@ -100,11 +126,38 @@ final class CoreRuntime: ObservableObject {
            let info = try? JSONDecoder().decode(EngineInfo.self, from: data) {
             self.info = info
             phase = .ready
+            Diag.log("engine: готов на \(info.url) за \(Double(attempts) * 0.5) с")
             return
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.poll()
+        }
+    }
+}
+
+/// Запуск Node так, как его ждёт libuv: argv должен лежать одним куском памяти
+/// (libuv перезаписывает его ради заголовка процесса), а стек потока должен
+/// быть большим — V8 берёт от него свой предел.
+enum NodeLauncher {
+    static func run(_ arguments: [String]) -> Int32 {
+        let total = arguments.reduce(0) { $0 + $1.utf8.count + 1 }
+        let buffer = UnsafeMutablePointer<CChar>.allocate(capacity: total)
+        defer { buffer.deallocate() }
+
+        var argv: [UnsafeMutablePointer<CChar>?] = []
+        var cursor = buffer
+        for argument in arguments {
+            argument.withCString { source in
+                let length = strlen(source) + 1
+                cursor.update(from: source, count: length)
+                argv.append(cursor)
+                cursor += length
+            }
+        }
+
+        return argv.withUnsafeMutableBufferPointer { pointer in
+            node_start(Int32(arguments.count), pointer.baseAddress)
         }
     }
 }
