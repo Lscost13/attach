@@ -89,11 +89,11 @@ jobs:
 
       - name: Упаковать движок
         if: inputs.engine != 'false'
-        working-directory: app/Engine
+        working-directory: app
         run: |
-          rm -f ../engine.zip
-          zip -qry ../engine.zip .
-          du -h ../engine.zip
+          rm -f engine.bin
+          node ../scripts/pack-engine.mjs Engine engine.bin
+          du -h engine.bin
 
       - name: Опубликовать движок
         if: inputs.engine != 'false'
@@ -103,7 +103,7 @@ jobs:
         run: |
           tag="engine-latest"
           gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
-          gh release create "$tag" engine.zip \
+          gh release create "$tag" engine.bin \
             --title "Движок Attach" \
             --notes "Архив движка DSH для первого запуска. Пересобирается каждой сборкой." \
             --repo "${{ github.repository }}"
@@ -138,9 +138,6 @@ jobs:
         working-directory: app
         run: xcodegen generate
 
-      - name: Разрешить пакеты
-        working-directory: app
-        run: xcodebuild -resolvePackageDependencies -project Attach.xcodeproj -scheme Attach
 
       - name: Собрать без подписи
         working-directory: app

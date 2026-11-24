@@ -1,10 +1,9 @@
 import Foundation
 import SwiftUI
-import ZIPFoundation
 
-/// Движок больше не лежит в бандле: при первом запуске скачиваем архив и
-/// распаковываем в Documents. Так IPA остаётся маленьким и его берут
-/// сторонние подписчики.
+/// Движок не лежит в бандле: при первом запуске скачиваем один файл
+/// и распаковываем в Documents. Так IPA остаётся маленьким и его
+/// берут сторонние подписчики (Feather и подобные).
 @MainActor
 final class EngineInstaller: ObservableObject {
     enum Phase: Equatable {
@@ -20,7 +19,7 @@ final class EngineInstaller: ObservableObject {
     @Published private(set) var phase: Phase = .checking
 
     private let remote = URL(
-        string: "https://github.com/Lscost13/attach/releases/download/engine-latest/engine.zip"
+        string: "https://github.com/Lscost13/attach/releases/download/engine-latest/engine.bin"
     )!
 
     var engineDirectory: URL {
@@ -48,8 +47,7 @@ final class EngineInstaller: ObservableObject {
             phase = .unpacking
 
             try? FileManager.default.removeItem(at: engineDirectory)
-            try FileManager.default.createDirectory(at: engineDirectory, withIntermediateDirectories: true)
-            try FileManager.default.unzipItem(at: temp, to: engineDirectory)
+            try EngineArchive.unpack(archive: temp, to: engineDirectory)
 
             guard isReady else { throw EngineError.noEntry }
             phase = .ready
