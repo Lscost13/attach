@@ -170,6 +170,10 @@ final class EngineInstaller: ObservableObject {
             return
         }
 
+        // Движка нет — значит всё, что лежит в папке, мусор от прошлой попытки.
+        // Освобождаем место: архив весит 282 МБ, а распакованный движок — около 700.
+        try? FileManager.default.removeItem(at: engineDirectory)
+
         do {
             if !hasArchive {
                 try await download()
