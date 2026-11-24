@@ -33,13 +33,7 @@ enum Diag {
             signal(sig, attachCrashSignal)
         }
 
-        NSSetUncaughtExceptionHandler { exception in
-            let text = """
-            \(clock()) UNCAUGHT \(exception.name.rawValue): \(exception.reason ?? "-")
-            \(exception.callStackSymbols.prefix(40).joined(separator: "\n"))
-            """
-            append(text, to: crashURL)
-        }
+        NSSetUncaughtExceptionHandler(attachUncaught)
 
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         log("launch build \(version), ios \(ProcessInfo.processInfo.operatingSystemVersionString)")
@@ -163,6 +157,17 @@ enum Diag {
         try? Data().write(to: crashURL)
         log("journal cleared")
     }
+
+    /// Запись в файл падений — её делает обработчик исключений.
+    fileprivate static func recordCrash(_ text: String) {
+        append("\(clock()) \(text)", to: crashURL)
+    }
+}
+
+/// Неперехваченное исключение: пишем в журнал, приложение всё равно завершится.
+private func attachUncaught(_ exception: NSException) {
+    let stack = exception.callStackSymbols.prefix(40).joined(separator: "\n")
+    Diag.recordCrash("UNCAUGHT \(exception.name.rawValue): \(exception.reason ?? "-")\n\(stack)")
 }
 
 /// Обработчик сигнала: успевает только дописать метку в файл.
