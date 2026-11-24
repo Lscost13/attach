@@ -82,6 +82,9 @@ final class CoreRuntime: ObservableObject {
         setenv("ATTACH_ENGINE", engine.path, 1)
         setenv("ATTACH_WORKDIR", work.path, 1)
         setenv("ATTACH_PORT", String(port), 1)
+        // Файл от прошлого запуска: токен у нового ядра будет другой,
+        // и со старым приложение стучалось бы в пустоту.
+        try? FileManager.default.removeItem(at: stateFile)
 
         Diag.log("engine: boot \(script.path) → \(engine.path)")
 

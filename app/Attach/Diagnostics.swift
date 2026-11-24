@@ -28,6 +28,16 @@ enum Diag {
 
         trim(appURL)
         trim(engineURL)
+
+        // Отчёт от прошлого запуска — это и есть падение. Переносим его,
+        // чтобы не принимать старую запись за новую.
+        if (fileSize(crashURL) ?? 0) > 0 {
+            crashedLastRun = true
+            let previous = directory.appendingPathComponent("crash-prev.log")
+            try? FileManager.default.removeItem(at: previous)
+            try? FileManager.default.moveItem(at: crashURL, to: previous)
+        }
+
         signalFD = open(crashURL.path, O_CREAT | O_WRONLY | O_APPEND, 0o644)
         for sig in [SIGABRT, SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP] {
             signal(sig, attachCrashSignal)
@@ -38,6 +48,12 @@ enum Diag {
         let version = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         log("launch build \(version), ios \(ProcessInfo.processInfo.operatingSystemVersionString)")
         startMemorySampler()
+    }
+
+    /// Был ли прошлый запуск неудачным: плашку показываем только за него.
+    static var crashedLastRun: Bool {
+        get { UserDefaults.standard.bool(forKey: "diag.crashedLastRun") }
+        set { UserDefaults.standard.set(newValue, forKey: "diag.crashedLastRun") }
     }
 
     // MARK: - Запись
@@ -136,6 +152,11 @@ enum Diag {
         var parts: [String] = []
         parts.append("Attach · журнал")
         parts.append("время: \(Date())")
+
+        let previous = tail(of: directory.appendingPathComponent("crash-prev.log"))
+        if !previous.isEmpty {
+            parts.append("\n— прошлый запуск —\n\(previous)")
+        }
 
         let crash = tail(of: crashURL)
         if crash.isEmpty {

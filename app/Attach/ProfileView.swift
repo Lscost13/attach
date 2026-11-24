@@ -56,7 +56,7 @@ struct ProfileView: View {
                     .ignoresSafeArea()
             }
             .task {
-                crashed = Diag.hasCrash
+                crashed = Diag.crashedLastRun || Diag.hasCrash
                 storage = await CoreStorage.measure()
                 account = await loadAccount()
                 if models.hasKey, models.provider == .deepseek {

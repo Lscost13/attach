@@ -48,8 +48,15 @@ struct RootView: View {
                 VStack {
                     Spacer()
                     CrashNotice(
-                        onOpen: { showJournal = true },
-                        onClose: { hasCrash = false }
+                        onOpen: {
+                            Diag.crashedLastRun = false
+                            hasCrash = false
+                            showJournal = true
+                        },
+                        onClose: {
+                            Diag.crashedLastRun = false
+                            hasCrash = false
+                        }
                     )
                 }
                 .transition(.opacity)
@@ -62,7 +69,7 @@ struct RootView: View {
             if !models.hasKey { showSetup = true }
         }
         .onAppear {
-            hasCrash = Diag.hasCrash
+            hasCrash = Diag.crashedLastRun
             if engineReady {
                 CoreRuntime.shared.bootIfNeeded()
                 if !models.hasKey { showSetup = true }
