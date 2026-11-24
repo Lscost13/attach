@@ -74,7 +74,7 @@ enum EngineError: LocalizedError {
     case http(Int)
     case tooSmall(Int64)
     case noSpace(Int64)
-    case noEntry
+    case unpackTimeout
     case badArchive(String)
 
     var errorDescription: String? {
@@ -84,13 +84,21 @@ enum EngineError: LocalizedError {
         case .tooSmall(let size):
             return "Скачалось \(size) байт вместо движка — похоже, пришла страница ошибки."
         case .noSpace(let free):
-            return "Мало места: свободно \(free / 1_048_576) МБ, нужно около 900."
-        case .noEntry:
-            return "В архиве нет самого DSH — движок скачался неправильно."
-        case .badArchive(let name):
-            return "Не удалось распаковать \(name)."
+            return "Мало места: свободно \(free / 1_048_576) МБ, нужно около 1200."
+        case .unpackTimeout:
+            return "Распаковка не закончилась за 15 минут. Нажми «Повторить»."
+        case .badArchive(let reason):
+            return "Не удалось распаковать движок: \(reason)"
         }
     }
+}
+
+/// Состояние распаковки, которое пишет ядро.
+struct UnpackState: Codable {
+    var phase: String = "unpack"
+    var done: Int = 0
+    var total: Int = 0
+    var error: String?
 }
 
 /// Движок не лежит в бандле: при первом запуске скачиваем один файл
@@ -119,24 +127,38 @@ final class EngineInstaller: ObservableObject {
         string: "https://github.com/Lscost13/attach/releases/download/engine-latest/engine.bin"
     )!
 
-    var engineDirectory: URL {
+    private var documents: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("engine", isDirectory: true)
     }
 
-    /// Готовность — это сам DSH внутри движка, а не файл скрипта:
-    /// скрипт запуска теперь в приложении.
-    var dshPackage: URL {
-        engineDirectory
-            .appendingPathComponent("node_modules", isDirectory: true)
-            .appendingPathComponent("@deepseek-ai", isDirectory: true)
-            .appendingPathComponent("dsh", isDirectory: true)
-            .appendingPathComponent("package.json")
+    var engineDirectory: URL {
+        documents.appendingPathComponent("engine", isDirectory: true)
+    }
+
+    /// Скачанный архив движка. Node распаковывает его сам, когда стартует.
+    var archiveURL: URL {
+        documents.appendingPathComponent(".attach/engine.bin")
+    }
+
+    /// Отметка «распаковано» — её пишет ядро после успешной распаковки.
+    var markerURL: URL {
+        documents.appendingPathComponent(".attach/engine-ready")
+    }
+
+    var unpackStateURL: URL {
+        documents.appendingPathComponent(".attach/unpack.json")
     }
 
     var isReady: Bool {
-        FileManager.default.fileExists(atPath: dshPackage.path)
+        FileManager.default.fileExists(atPath: markerURL.path)
     }
+
+    /// Архив на месте — уже можно поднимать Node, он сам всё разложит.
+    var hasArchive: Bool {
+        FileManager.default.fileExists(atPath: archiveURL.path)
+    }
+
+    private var archiveSuspect = false
 
     func prepareIfNeeded() async {
         guard !running else { return }
@@ -148,65 +170,95 @@ final class EngineInstaller: ObservableObject {
             return
         }
 
-        progress = 0
-        receivedText = ""
-        phase = .downloading
-        Diag.log("engine: качаем \(remote.absoluteString)")
-
         do {
-            try ensureFreeSpace()
-
-            let temp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("engine-download.bin")
-            let downloader = EngineDownloader(destination: temp)
-            try await downloader.download(from: remote) { [weak self] value in
-                Task { @MainActor in
-                    self?.progress = value
-                    self?.receivedText = "\(Int(value * 100))%"
-                }
+            if !hasArchive {
+                try await download()
             }
-
-            let attributes = try? FileManager.default.attributesOfItem(atPath: temp.path)
-            let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
-            Diag.log("engine: скачано \(size) байт")
-            guard size > 1_000_000 else { throw EngineError.tooSmall(size) }
 
             phase = .unpacking
             unpackProgress = 0
             unpackText = "0%"
-            try? FileManager.default.removeItem(at: engineDirectory)
+            Diag.log("engine: архив на месте, ждём распаковку")
 
-            let archive = temp
-            let destination = engineDirectory
-            do {
-                // Распаковка — самая долгая часть: 70 тысяч файлов.
-                // Только не на главном потоке, иначе интерфейс умирает.
-                try await Task.detached(priority: .userInitiated) {
-                    try EngineArchive.unpack(archive: archive, to: destination) { done, total in
-                        guard total > 0 else { return }
-                        let value = Double(done) / Double(total)
-                        Task { @MainActor in
-                            EngineInstaller.shared.unpackProgress = value
-                            EngineInstaller.shared.unpackText = "\(Int(value * 100))%"
-                        }
-                    }
-                }.value
-            } catch {
-                Diag.log("engine: распаковка не удалась — \(error.localizedDescription)")
-                throw EngineError.badArchive(error.localizedDescription)
-            }
-            try? FileManager.default.removeItem(at: temp)
+            // Распаковывает ядро: у него тот же zlib, которым архив собран.
+            CoreRuntime.shared.bootIfNeeded()
+            try await waitForUnpack()
 
-            guard isReady else { throw EngineError.noEntry }
             phase = .ready
-            Diag.log("engine: распакован в \(engineDirectory.path)")
+            Diag.log("engine: движок распакован")
         } catch {
             phase = .failed(Self.message(for: error))
             Diag.log("engine: ошибка — \(Self.message(for: error))")
         }
     }
 
+    private func download() async throws {
+        progress = 0
+        receivedText = ""
+        phase = .downloading
+        Diag.log("engine: качаем \(remote.absoluteString)")
+        try ensureFreeSpace()
+
+        try? FileManager.default.createDirectory(
+            at: archiveURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let partial = archiveURL.appendingPathExtension("part")
+        try? FileManager.default.removeItem(at: partial)
+
+        let downloader = EngineDownloader(destination: partial)
+        try await downloader.download(from: remote) { [weak self] value in
+            Task { @MainActor in
+                self?.progress = value
+                self?.receivedText = "\(Int(value * 100))%"
+            }
+        }
+
+        let attributes = try? FileManager.default.attributesOfItem(atPath: partial.path)
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+        Diag.log("engine: скачано \(size) байт")
+        guard size > 100_000_000 else { throw EngineError.tooSmall(size) }
+
+        try? FileManager.default.removeItem(at: archiveURL)
+        try FileManager.default.moveItem(at: partial, to: archiveURL)
+    }
+
+    private func waitForUnpack() async throws {
+        let deadline = Date().addingTimeInterval(900)
+
+        while Date() < deadline {
+            if isReady { return }
+
+            if case .failed(let reason) = CoreRuntime.shared.phase {
+                archiveSuspect = true
+                throw EngineError.badArchive(reason)
+            }
+
+            if let data = try? Data(contentsOf: unpackStateURL),
+               let state = try? JSONDecoder().decode(UnpackState.self, from: data) {
+                if state.phase == "failed" {
+                    archiveSuspect = true
+                    throw EngineError.badArchive(state.error ?? "неизвестная ошибка")
+                }
+                if state.total > 0 {
+                    let value = min(1, Double(state.done) / Double(state.total))
+                    unpackProgress = value
+                    unpackText = "\(Int(value * 100))% · \(state.done) из \(state.total)"
+                }
+            }
+
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+
+        throw EngineError.unpackTimeout
+    }
+
     func retry() {
+        // Если архив подвёл — качаем заново, иначе просто пробуем ещё раз.
+        if archiveSuspect || !hasArchive {
+            try? FileManager.default.removeItem(at: archiveURL)
+        }
+        archiveSuspect = false
         phase = .checking
         Task { await prepareIfNeeded() }
     }
@@ -214,7 +266,7 @@ final class EngineInstaller: ObservableObject {
     private func ensureFreeSpace() throws {
         let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let values = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
-        if let free = values?.volumeAvailableCapacityForImportantUsage, free < 900 * 1_048_576 {
+        if let free = values?.volumeAvailableCapacityForImportantUsage, free < 1_200 * 1_048_576 {
             throw EngineError.noSpace(free)
         }
     }

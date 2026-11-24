@@ -78,6 +78,10 @@ jobs:
         if: inputs.engine != 'false'
         working-directory: app
         run: |
+          # Архив распаковывает само ядро; в проверке он уже разложен,
+          # поэтому ставим отметку «распаковано».
+          mkdir -p "$HOME/.attach"
+          touch "$HOME/.attach/engine-ready"
           node --expose-internals Engine/main.js > /tmp/engine.log 2>&1 &
           ok=0
           for i in $(seq 1 120); do

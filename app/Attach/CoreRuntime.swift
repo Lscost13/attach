@@ -56,7 +56,9 @@ final class CoreRuntime: ObservableObject {
 
     private func startNode() {
         let engine = EngineInstaller.shared.engineDirectory
-        guard EngineInstaller.shared.isReady else {
+        // Распаковкой занимается сам Node, поэтому запускаем его и тогда,
+        // когда движок ещё лежит одним архивом.
+        guard EngineInstaller.shared.isReady || EngineInstaller.shared.hasArchive else {
             phase = .failed("движок не скачан")
             return
         }
@@ -119,8 +121,8 @@ final class CoreRuntime: ObservableObject {
 
     private func poll() {
         attempts += 1
-        guard attempts <= 240 else {
-            phase = .failed("DSH не поднялся за 2 минуты. Подробности — в журнале.")
+        guard attempts <= 1200 else {
+            phase = .failed("DSH не поднялся за 10 минут. Подробности — в журнале.")
             Diag.log("engine: таймаут ожидания engine.json")
             return
         }

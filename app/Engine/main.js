@@ -9,6 +9,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const { pathToFileURL } = require('url');
 
 const engineDir = process.env.ATTACH_ENGINE || __dirname;
@@ -17,6 +18,9 @@ const workdir = process.env.ATTACH_WORKDIR || home;
 const stateDir = path.join(home, '.attach');
 const stateFile = path.join(stateDir, 'engine.json');
 const logFile = path.join(stateDir, 'engine.log');
+const archiveFile = path.join(stateDir, 'engine.bin');
+const markerFile = path.join(stateDir, 'engine-ready');
+const unpackFile = path.join(stateDir, 'unpack.json');
 const logLimit = 512 * 1024;
 
 fs.mkdirSync(stateDir, { recursive: true });
@@ -115,6 +119,98 @@ process.exit = function (code) {
   throw new Error(`process.exit(${code})`);
 };
 
+// --- распаковка движка ---------------------------------------------------
+// Раньше это делал Swift системным zlib, и часть файлов приезжала битой:
+// DSH падал на «Invalid or unexpected token». Node разжимает ровно тем же
+// zlib, которым архив собран, поэтому распаковываем здесь.
+
+function writeUnpack(data) {
+  try {
+    fs.writeFileSync(unpackFile, JSON.stringify(data));
+  } catch {}
+}
+
+function readExact(fd, length, position) {
+  const buffer = Buffer.alloc(length);
+  let read = 0;
+  while (read < length) {
+    const chunk = fs.readSync(fd, buffer, read, length - read, position + read);
+    if (chunk <= 0) throw new Error('архив обрезан');
+    read += chunk;
+  }
+  return buffer;
+}
+
+function ensureEngine() {
+  if (fs.existsSync(markerFile)) return;
+  if (!fs.existsSync(archiveFile)) throw new Error(`нет файла движка: ${archiveFile}`);
+
+  const size = fs.statSync(archiveFile).size;
+  toLog(`[attach] unpack ${archiveFile} (${size} байт)\n`);
+  writeUnpack({ phase: 'unpack', done: 0, total: 0 });
+
+  const fd = fs.openSync(archiveFile, 'r');
+  try {
+    const header = readExact(fd, 10, 0);
+    if (header.toString('ascii', 0, 4) !== 'ATGE') throw new Error('это не архив движка');
+
+    const total = header.readUInt32LE(6);
+    let offset = 10;
+
+    for (let index = 0; index < total; index += 1) {
+      const nameLength = readExact(fd, 2, offset).readUInt16LE(0);
+      offset += 2;
+
+      const name = readExact(fd, nameLength, offset).toString('utf8');
+      offset += nameLength;
+
+      const sizes = readExact(fd, 8, offset);
+      offset += 8;
+      const rawLength = sizes.readUInt32LE(0);
+      const compLength = sizes.readUInt32LE(4);
+
+      let data = Buffer.alloc(0);
+      if (compLength > 0) {
+        const compressed = readExact(fd, compLength, offset);
+        if (rawLength > 0) {
+          try {
+            data = zlib.inflateSync(compressed);
+          } catch {
+            data = zlib.inflateRawSync(compressed.subarray(2));
+          }
+          if (data.length !== rawLength) {
+            throw new Error(`${name}: ${data.length} байт вместо ${rawLength}`);
+          }
+        }
+      }
+      offset += compLength;
+
+      const target = path.join(engineDir, name);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, data);
+
+      if ((index + 1) % 500 === 0) {
+        writeUnpack({ phase: 'unpack', done: index + 1, total });
+      }
+    }
+
+    fs.writeFileSync(markerFile, String(size));
+    writeUnpack({ phase: 'done', done: total, total });
+    try {
+      fs.unlinkSync(archiveFile);
+    } catch {}
+    toLog(`[attach] unpack ok: ${total} файлов\n`);
+  } catch (error) {
+    writeUnpack({ phase: 'failed', error: String((error && error.message) || error) });
+    toLog(`[attach] unpack failed: ${(error && (error.stack || error.message)) || error}\n`);
+    throw error;
+  } finally {
+    try {
+      fs.closeSync(fd);
+    } catch {}
+  }
+}
+
 // --- сам движок ---------------------------------------------------------
 
 async function main() {
@@ -127,6 +223,8 @@ async function main() {
   } catch (error) {
     toLog(`[attach] chdir failed: ${error && error.message}\n`);
   }
+
+  ensureEngine();
 
   const pkgPath = require.resolve('@deepseek-ai/dsh/package.json', { paths: [engineDir] });
   const pkg = require(pkgPath);
