@@ -2,8 +2,9 @@ import Compression
 import Foundation
 
 /// Распаковка движка из нашего формата: заголовок + записи
-/// [длина имени][имя][исходный размер][сжатый размер][байты zlib].
-/// Системный Compression умеет zlib, поэтому зависимостей нет.
+/// [длина имени][имя][исходный размер][сжатый размер][байты].
+/// Apple-овский Compression понимает zlib по-разному в разных версиях,
+/// поэтому пробуем и «сырой» deflate, и поток с zlib-заголовком.
 enum EngineArchive {
     enum ArchiveError: LocalizedError {
         case badMagic
@@ -12,9 +13,9 @@ enum EngineArchive {
 
         var errorDescription: String? {
             switch self {
-            case .badMagic: return "Файл движка повреждён"
-            case .truncated: return "Файл движка обрезан"
-            case .inflateFailed(let name): return "Не удалось распаковать \(name)"
+            case .badMagic: return "файл движка повреждён"
+            case .truncated: return "файл движка обрезан"
+            case .inflateFailed(let name): return "не удалось распаковать \(name)"
             }
         }
     }
@@ -55,7 +56,7 @@ enum EngineArchive {
                     withIntermediateDirectories: true
                 )
 
-                if originalSize == 0 {
+                guard originalSize > 0, compressedSize > 0 else {
                     FileManager.default.createFile(atPath: fileURL.path, contents: Data())
                     offset += compressedSize
                     continue
@@ -63,19 +64,44 @@ enum EngineArchive {
 
                 let source = (base + offset).assumingMemoryBound(to: UInt8.self)
                 var output = Data(count: originalSize)
-                let written = output.withUnsafeMutableBytes { buffer -> Int in
-                    guard let destinationPointer = buffer.bindMemory(to: UInt8.self).baseAddress else { return 0 }
-                    return compression_decode_buffer(
-                        destinationPointer, originalSize,
-                        source, compressedSize,
-                        nil, COMPRESSION_ZLIB
+                var written = decode(source: source, size: compressedSize, into: &output, expected: originalSize)
+
+                // Если не сошлось — значит поток был с zlib-заголовком:
+                // пропускаем 2 байта заголовка и 4 байта контрольной суммы.
+                if written != originalSize, compressedSize > 6 {
+                    output = Data(count: originalSize)
+                    let wrapped = (base + offset + 2).assumingMemoryBound(to: UInt8.self)
+                    written = decode(
+                        source: wrapped,
+                        size: compressedSize - 6,
+                        into: &output,
+                        expected: originalSize
                     )
                 }
-                guard written == originalSize else { throw ArchiveError.inflateFailed(name) }
+
+                guard written == originalSize else {
+                    throw ArchiveError.inflateFailed("\(name) (\(written) из \(originalSize))")
+                }
 
                 try output.write(to: fileURL)
                 offset += compressedSize
             }
+        }
+    }
+
+    private static func decode(
+        source: UnsafePointer<UInt8>,
+        size: Int,
+        into output: inout Data,
+        expected: Int
+    ) -> Int {
+        output.withUnsafeMutableBytes { buffer -> Int in
+            guard let destination = buffer.bindMemory(to: UInt8.self).baseAddress else { return 0 }
+            return compression_decode_buffer(
+                destination, expected,
+                source, size,
+                nil, COMPRESSION_ZLIB
+            )
         }
     }
 
