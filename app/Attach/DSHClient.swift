@@ -134,6 +134,11 @@ final class DSHClient {
         return list.compactMap { $0["name"] as? String }
     }
 
+    /// Останавливает текущий ход агента, не теряя очередь сообщений.
+    func cancel(sessionId: String) async throws {
+        _ = try await rpc("session/cancel", args: ["sessionId": sessionId])
+    }
+
     // MARK: Аккаунт DeepSeek
 
     private static var clientMetadata: [String: Any] {

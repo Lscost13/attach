@@ -2,8 +2,8 @@ import SwiftUI
 
 /// Экран запуска: ядро поднимается сразу, а человек видит, на каком оно шаге.
 struct BootView: View {
-    let installer: EngineInstaller
-    let core: CoreRuntime
+    @ObservedObject var installer: EngineInstaller
+    @ObservedObject var core: CoreRuntime
 
     @State private var spin: Double = 0
     @State private var breathe = false

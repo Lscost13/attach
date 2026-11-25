@@ -311,6 +311,7 @@ struct ChatView: View {
     private var chat: Chat? { store.chat(route) }
     private var messages: [ChatMessage] { chat?.messages ?? [] }
     @State private var isSending = false
+    @State private var activeSession: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -355,7 +356,20 @@ struct ChatView: View {
                     Text("DSH работает…")
                         .font(.footnote)
                         .foregroundStyle(.white.opacity(0.5))
+                    Spacer(minLength: 0)
+                    Button {
+                        stop()
+                    } label: {
+                        Text("Остановить")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(.white.opacity(0.08), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 18)
                 .padding(.bottom, 6)
             }
 
@@ -417,6 +431,23 @@ struct ChatView: View {
         .background(Color.black)
     }
 
+    /// Останавливает ход: ядро прекращает работу, очередь сообщений не теряется.
+    private func stop() {
+        guard let sessionId = activeSession else {
+            isSending = false
+            return
+        }
+        Task { @MainActor in
+            if let info = CoreRuntime.shared.info, let baseURL = URL(string: info.url) {
+                let client = DSHClient(base: baseURL)
+                try? await client.handshake(token: info.token ?? "")
+                try? await client.cancel(sessionId: sessionId)
+            }
+            store.append(ChatMessage(role: .assistant, text: "Остановлено"), to: route)
+            isSending = false
+        }
+    }
+
     private func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
@@ -472,17 +503,41 @@ struct ChatView: View {
                     sessionId = try await client.createSession()
                     store.setEngineSession(sessionId, for: route)
                 }
+                activeSession = sessionId
 
                 let before = (try? await client.page(sessionId: sessionId).count) ?? 0
                 try await client.prompt(sessionId: sessionId, text: text)
 
                 var reply = DSHReply()
-                for _ in 0..<240 {
+                var signature = ""
+                var lastProgress = Date()
+                var hinted = false
+                for _ in 0..<1200 {
                     try await Task.sleep(nanoseconds: 500_000_000)
                     let records = try await client.page(sessionId: sessionId)
                     let tail = Array(records.dropFirst(before))
                     reply = DSHParse.lastTurn(from: tail)
-                    apply(DSHParse.segments(from: tail))
+                    let segments = DSHParse.segments(from: tail)
+                    apply(segments)
+
+                    let fresh = "\(segments.count):\(reply.text.count)"
+                    if fresh != signature {
+                        signature = fresh
+                        lastProgress = Date()
+                    } else if !hinted, !reply.finished,
+                              Date().timeIntervalSince(lastProgress) > 45 {
+                        // Движок молчит: скорее всего агент ждёт ответа,
+                        // а показать вопрос пока негде.
+                        hinted = true
+                        store.append(
+                            ChatMessage(
+                                role: .assistant,
+                                text: "Агент ждёт ответа на вопрос, а показать его здесь пока нельзя. Нажми «Остановить» и переформулируй."
+                            ),
+                            to: route
+                        )
+                    }
+
                     if reply.finished { break }
                 }
 
@@ -500,6 +555,7 @@ struct ChatView: View {
                 store.append(ChatMessage(role: .assistant, text: "Ошибка: \(error.localizedDescription)"), to: route)
                 LiveActivityController.shared.finish(status: "ошибка")
             }
+            activeSession = nil
             isSending = false
         }
     }
