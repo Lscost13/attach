@@ -151,8 +151,42 @@ jobs:
         run: xcodegen generate
 
 
-      - name: Собрать без подписи
+      - name: Сертификат и профиль
+        env:
+          CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+          PROFILE_B64: ${{ secrets.SIGNING_PROFILE }}
+        run: |
+          if [ -z "$CERT_P12" ] || [ -z "$PROFILE_B64" ]; then
+            echo "::error::нет секретов подписи (SIGNING_CERT_P12 / SIGNING_PROFILE)"
+            exit 1
+          fi
+
+          # Ключница для подписи
+          security create-keychain -p actions build.keychain
+          security set-keychain-settings -lut 3600 build.keychain
+          security unlock-keychain -p actions build.keychain
+          security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
+
+          printf '%s' "$CERT_P12" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain > /dev/null
+
+          printf '%s' "$PROFILE_B64" | base64 --decode > /tmp/profile.mobileprovision
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          security cms -D -i /tmp/profile.mobileprovision > /tmp/profile.plist
+          UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /tmp/profile.plist)
+          cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+
+          echo "--- подписывающие сертификаты ---"
+          security find-identity -v -p codesigning build.keychain
+          /usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist
+
+      - name: Собрать с подписью
         working-directory: app
+        env:
+          TEAM: ${{ secrets.TEAM_ID }}
         run: |
           xcodebuild build \
             -project Attach.xcodeproj \
@@ -160,10 +194,12 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$PWD/build" \
+            -allowProvisioningUpdates \
             PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="$TEAM" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="iPhone Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID" \
             ONLY_ACTIVE_ARCH=NO
 
       - name: Упаковать IPA
@@ -178,9 +214,11 @@ jobs:
             ls -la "$APP/PlugIns" || true
             exit 1
           fi
-          if [ -d "$APP/PlugIns/AttachWidgets.appex" ]; then
-            echo "--- extension signature ---"
-            codesign -dv "$APP/PlugIns/AttachWidgets.appex" 2>&1 | head -n 6 || true
+          echo "--- подпись приложения ---"
+          codesign -dv --entitlements - "$APP" 2>&1 | head -n 20
+          if ! codesign --verify --deep --strict "$APP"; then
+            echo "::error::подпись не прошла проверку"
+            exit 1
           fi
           rm -rf Payload Attach.ipa
           mkdir Payload
@@ -190,6 +228,45 @@ jobs:
           unzip -t Attach.ipa > /dev/null && echo "ipa: архив целый"
           du -h Attach.ipa
 
+      - name: Манифест для установки с телефона
+        working-directory: app
+        run: |
+          BUILD="${{ github.run_number }}"
+          cat > manifest.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>items</key>
+            <array>
+              <dict>
+                <key>assets</key>
+                <array>
+                  <dict>
+                    <key>kind</key>
+                    <string>software-package</string>
+                    <key>url</key>
+                    <string>https://lscost13.github.io/attach/Attach.ipa</string>
+                  </dict>
+                </array>
+                <key>metadata</key>
+                <dict>
+                  <key>bundle-identifier</key>
+                  <string>$BUNDLE_ID</string>
+                  <key>bundle-version</key>
+                  <string>$BUILD</string>
+                  <key>kind</key>
+                  <string>software</string>
+                  <key>title</key>
+                  <string>Attach</string>
+                </dict>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint manifest.plist
+
       - name: Опубликовать IPA
         if: github.event_name == 'workflow_dispatch'
         working-directory: app
@@ -197,11 +274,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${{ github.run_number }}"
-          gh release create "$tag" Attach.ipa \
+          gh release create "$tag" Attach.ipa manifest.plist \
             --title "Attach · сборка ${{ github.run_number }}" \
-            --notes "Прямая ссылка на IPA, без zip и распаковки." \
+            --notes "IPA + манифест для установки по воздуху." \
             --repo "${{ github.repository }}"
           echo "https://github.com/${{ github.repository }}/releases/download/$tag/Attach.ipa"
+
+      - name: Выложить для установки по воздуху
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p site
+          cp Attach.ipa manifest.plist site/
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ru"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Attach</title>
+          <style>
+            body { background:#000; color:#fff; font: 17px -apple-system, system-ui, sans-serif;
+                   display:flex; min-height:100vh; margin:0; align-items:center; justify-content:center; }
+            .card { text-align:center; padding:32px; }
+            a { display:inline-block; margin-top:24px; padding:16px 32px; border-radius:18px;
+                background:#fff; color:#000; text-decoration:none; font-weight:600; }
+          </style></head>
+          <body><div class="card">
+            <h1>Attach</h1>
+            <p>Нажми кнопку — iOS предложит установить сборку.</p>
+            <a href="itms-services://?action=download-manifest&amp;url=https://lscost13.github.io/attach/manifest.plist">Установить</a>
+          </div></body></html>
+          HTML
+          cd site
+          git init -q
+          git checkout -q -b gh-pages
+          git add -A
+          git -c user.name="github-actions" -c user.email="actions@github.com" commit -qm "сборка ${{ github.run_number }}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" gh-pages
+          echo "http://lscost13.github.io/attach/"
 
       - name: Артефакт
         uses: actions/upload-artifact@v4

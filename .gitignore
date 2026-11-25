@@ -16,3 +16,6 @@ app/Attach/engine-main.js
 
 # Локальные прогоны
 .tmp/
+
+# Подпись (не в репозиторий)
+signing/
