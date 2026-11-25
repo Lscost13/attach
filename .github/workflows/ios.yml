@@ -8,7 +8,7 @@ on:
       widgets:
         description: "Собрать с Live Activity"
         type: boolean
-        default: true
+        default: false
       engine:
         description: "Включить движок DSH (выкл — лёгкая сборка для теста)"
         type: boolean
@@ -273,6 +273,9 @@ jobs:
           </plist>
           PLIST
           plutil -lint manifest.plist
+          # iOS капризнее к типу содержимого, а GitHub Pages отдаёт .plist
+          # как поток байтов. Копия с .xml приходит как application/xml.
+          cp manifest.plist manifest.xml
 
       - name: Опубликовать IPA
         if: github.event_name == 'workflow_dispatch'
@@ -281,7 +284,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${{ github.run_number }}"
-          gh release create "$tag" Attach.ipa manifest.plist \
+          gh release create "$tag" Attach.ipa manifest.plist manifest.xml \
             --title "Attach · сборка ${{ github.run_number }}" \
             --notes "IPA + манифест для установки по воздуху." \
             --repo "${{ github.repository }}"
@@ -294,7 +297,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p site
-          cp Attach.ipa manifest.plist site/
+          cp Attach.ipa manifest.plist manifest.xml site/
           cat > site/index.html <<'HTML'
           <!doctype html>
           <html lang="ru"><head><meta charset="utf-8">
@@ -310,7 +313,7 @@ jobs:
           <body><div class="card">
             <h1>Attach</h1>
             <p>Нажми кнопку — iOS предложит установить сборку.</p>
-            <a href="itms-services://?action=download-manifest&amp;url=https://lscost13.github.io/attach/manifest.plist">Установить</a>
+            <a href="itms-services://?action=download-manifest&amp;url=https://lscost13.github.io/attach/manifest.xml">Установить</a>
           </div></body></html>
           HTML
           cd site
