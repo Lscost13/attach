@@ -24,7 +24,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-15
+    # arm64-раннеры GitHub регулярно не выдают («capacity constraints»),
+    # а Intel-пул свободнее. Для сборки это не важно — хост лишь запускает Xcode.
+    runs-on: macos-15-intel
     timeout-minutes: 60
     permissions:
       contents: write
