@@ -431,7 +431,7 @@ struct ChatView: View {
         Task { @MainActor in
             var rendered: [Int: UUID] = [:]
 
-            func apply(_ segments: [ChatSegment]) {
+            let apply: ([ChatSegment]) -> Void = { segments in
                 for (index, segment) in segments.enumerated() {
                     switch segment {
                     case .text(let text):
