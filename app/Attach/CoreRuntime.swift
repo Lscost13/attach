@@ -112,6 +112,20 @@ final class CoreRuntime: ObservableObject {
         Diag.log("engine: Node завершился с кодом \(code)")
     }
 
+    /// Живо ли ядро после возврата из фона: iOS могла усыпить процесс.
+    func checkAlive() {
+        guard booted, phase.isReady else { return }
+        Task {
+            do {
+                _ = try await EngineBridge.client()
+                Diag.log("engine: на связи после возврата")
+            } catch {
+                Diag.log("engine: нет ответа — \(error.localizedDescription)")
+                phase = .failed("ядро не отвечает. Закрой и открой приложение.")
+            }
+        }
+    }
+
     // MARK: - Готовность
 
     private var stateFile: URL {

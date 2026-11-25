@@ -429,6 +429,7 @@ struct ChatView: View {
         LiveActivityController.shared.start(chatTitle: chat?.title ?? "Чат")
 
         Task { @MainActor in
+            var live: ChatMessage?
             do {
                 guard let info = CoreRuntime.shared.info,
                       let baseURL = URL(string: info.url)
@@ -448,11 +449,20 @@ struct ChatView: View {
                 let before = (try? await client.page(sessionId: sessionId).count) ?? 0
                 try await client.prompt(sessionId: sessionId, text: text)
 
+                // Пузырь появляется сразу и наполняется по мере ответа:
+                // опрос истории каждые полсекунды, а не один раз в конце.
+                let placeholder = ChatMessage(role: .assistant, text: "")
+                live = placeholder
+                store.append(placeholder, to: route)
+
                 var reply = DSHReply()
-                for _ in 0..<120 {
-                    try await Task.sleep(nanoseconds: 800_000_000)
+                for _ in 0..<240 {
+                    try await Task.sleep(nanoseconds: 500_000_000)
                     let records = try await client.page(sessionId: sessionId)
                     reply = DSHParse.lastTurn(from: Array(records.dropFirst(before)))
+                    if !reply.text.isEmpty {
+                        store.updateMessage(placeholder.id, text: reply.text, in: route)
+                    }
                     if reply.finished { break }
                 }
 
@@ -464,15 +474,17 @@ struct ChatView: View {
                 } else {
                     answer = "Движок не ответил"
                 }
-                store.append(ChatMessage(role: .assistant, text: answer), to: route)
+                store.updateMessage(placeholder.id, text: answer, in: route, persist: true)
                 LiveActivityController.shared.finish(
                     status: reply.error == nil ? "готово" : "ошибка"
                 )
             } catch {
-                store.append(
-                    ChatMessage(role: .assistant, text: "Ошибка: \(error.localizedDescription)"),
-                    to: route
-                )
+                let text = "Ошибка: \(error.localizedDescription)"
+                if let live {
+                    store.updateMessage(live.id, text: text, in: route, persist: true)
+                } else {
+                    store.append(ChatMessage(role: .assistant, text: text), to: route)
+                }
                 LiveActivityController.shared.finish(status: "ошибка")
             }
             isSending = false

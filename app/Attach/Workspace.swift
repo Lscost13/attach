@@ -109,6 +109,20 @@ final class WorkspaceStore: ObservableObject {
         save()
     }
 
+    /// Обновляет текст сообщения — так ответ проявляется по мере генерации.
+    func updateMessage(_ id: UUID, text: String, in route: ChatRoute, persist: Bool = false) {
+        guard let pIndex = projects.firstIndex(where: { $0.id == route.projectID }),
+              let cIndex = projects[pIndex].chats.firstIndex(where: { $0.id == route.chatID }),
+              let mIndex = projects[pIndex].chats[cIndex].messages.firstIndex(where: { $0.id == id })
+        else { return }
+
+        projects[pIndex].chats[cIndex].messages[mIndex].text = text
+        if persist {
+            projects[pIndex].chats[cIndex].updatedAt = Date()
+            save()
+        }
+    }
+
     // MARK: DSH
 
     func engineSession(_ route: ChatRoute) -> String? {
