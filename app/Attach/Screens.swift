@@ -312,6 +312,7 @@ struct ChatView: View {
     private var messages: [ChatMessage] { chat?.messages ?? [] }
     @State private var isSending = false
     @State private var activeSession: String?
+    @State private var sendStartedAt: Date?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -351,26 +352,9 @@ struct ChatView: View {
             }
 
             if isSending {
-                HStack(spacing: 8) {
-                    ProgressView().tint(.white).scaleEffect(0.8)
-                    Text("DSH работает…")
-                        .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.5))
-                    Spacer(minLength: 0)
-                    Button {
-                        stop()
-                    } label: {
-                        Text("Остановить")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.8))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(.white.opacity(0.08), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
+                ThinkingBar(startedAt: sendStartedAt) {
+                    stop()
                 }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 6)
             }
 
             composer
@@ -457,6 +441,7 @@ struct ChatView: View {
         }
         draft = ""
         isSending = true
+        sendStartedAt = Date()
         LiveActivityController.shared.start(chatTitle: chat?.title ?? "Чат")
 
         Task { @MainActor in
@@ -558,13 +543,13 @@ struct ChatView: View {
                 LiveActivityController.shared.finish(status: "ошибка")
             }
             activeSession = nil
+            sendStartedAt = nil
             isSending = false
         }
     }
 }
 
-struct MessageBubble: View {
-    let message: ChatMessage
+struct MessageBubble: View {    let message: ChatMessage
 
     var body: some View {
         if message.role == .tool {
@@ -677,6 +662,64 @@ struct TasksView: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.5))
                     .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+}
+
+// MARK: - Индикатор работы агента
+
+/// Строка «агент работает»: пульсирующие точки, время и стоп.
+struct ThinkingBar: View {
+    let startedAt: Date?
+    var onStop: () -> Void
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            HStack(spacing: 10) {
+                ThinkingDots()
+
+                Text("DSH работает · \(elapsed(now: context.date)) с")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .contentTransition(.numericText())
+
+                Spacer(minLength: 0)
+
+                Button(action: onStop) {
+                    Text("Остановить")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.white.opacity(0.08), in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 6)
+        }
+    }
+
+    private func elapsed(now: Date) -> Int {
+        guard let startedAt else { return 0 }
+        return max(0, Int(now.timeIntervalSince(startedAt)))
+    }
+}
+
+/// Три точки, которые по очереди загораются.
+struct ThinkingDots: View {
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.3)) { context in
+            let step = Int(context.date.timeIntervalSinceReferenceDate / 0.3) % 3
+            HStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(.white.opacity(index == step ? 0.9 : 0.2))
+                        .frame(width: 5, height: 5)
+                        .scaleEffect(index == step ? 1.25 : 1)
+                        .animation(.easeInOut(duration: 0.2), value: step)
+                }
             }
         }
     }
