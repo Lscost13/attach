@@ -284,10 +284,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${{ github.run_number }}"
-          gh release create "$tag" Attach.ipa manifest.plist manifest.xml \
-            --title "Attach · сборка ${{ github.run_number }}" \
-            --notes "IPA + манифест для установки по воздуху." \
-            --repo "${{ github.repository }}"
+          # GitHub иногда отвечает 502 — пробуем несколько раз.
+          for attempt in 1 2 3; do
+            if gh release create "$tag" Attach.ipa manifest.plist manifest.xml \
+                 --title "Attach · сборка ${{ github.run_number }}" \
+                 --notes "IPA + манифест для установки по воздуху." \
+                 --repo "${{ github.repository }}"; then
+              break
+            fi
+            echo "попытка $attempt не прошла, ждём..."
+            sleep 15
+            if [ "$attempt" = "3" ]; then echo "::error::не удалось опубликовать релиз"; exit 1; fi
+          done
           echo "https://github.com/${{ github.repository }}/releases/download/$tag/Attach.ipa"
 
       - name: Выложить для установки по воздуху
