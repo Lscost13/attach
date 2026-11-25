@@ -309,6 +309,7 @@ struct ProfileView: View {
         switch core.phase {
         case .ready: return "на связи"
         case .starting: return "запускается…"
+        case .connecting: return "подключается…"
         case .failed: return "не поднялось"
         case .idle: return "не запущено"
         }

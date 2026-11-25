@@ -15,6 +15,7 @@ struct RootView: View {
     @State private var hasCrash = false
     /// Экран запуска ушёл — дальше работаем с приложением.
     @State private var booted = false
+    @State private var launchAt = Date()
 
     private var engineReady: Bool {
         installer.phase == .ready && core.phase.isReady
@@ -71,14 +72,20 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.45), value: booted)
         .onAppear {
             hasCrash = Diag.crashedLastRun
+            launchAt = Date()
+            Diag.log("boot: экран запуска")
             // Ядро поднимаем сразу, не дожидаясь действий человека.
             Task { await installer.prepareIfNeeded() }
         }
         .onChange(of: engineReady) { _, ready in
             guard ready else { return }
             Task {
-                // Даём экрану запуска показать «готово», иначе он мигнёт.
-                try? await Task.sleep(nanoseconds: 800_000_000)
+                // Даём экрану запуска показать шаги: ядро часто поднимается
+                // быстрее, чем глаз успевает заметить.
+                let elapsed = Date().timeIntervalSince(launchAt)
+                let wait = max(0.8, 2.2 - elapsed)
+                try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
+                Diag.log("boot: шаги заняли \(String(format: "%.1f", Date().timeIntervalSince(launchAt))) с")
                 withAnimation(.easeInOut(duration: 0.45)) {
                     booted = true
                 }

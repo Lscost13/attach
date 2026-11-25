@@ -109,6 +109,7 @@ struct BootView: View {
         switch core.phase {
         case .ready: return .ready
         case .starting: return .starting
+        case .connecting: return .connecting
         case .failed(let reason): return .failed(reason)
         case .idle: return .checking
         }

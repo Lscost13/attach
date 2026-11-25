@@ -8,6 +8,7 @@ final class CoreRuntime: ObservableObject {
     enum Phase: Equatable {
         case idle
         case starting
+        case connecting
         case ready
         case failed(String)
 
@@ -20,6 +21,7 @@ final class CoreRuntime: ObservableObject {
             switch self {
             case .idle: return "Ядро не запущено"
             case .starting: return "Ядро запускается…"
+            case .connecting: return "Подключаемся к ядру…"
             case .ready: return "Ядро на связи"
             case .failed: return "Ядро не поднялось"
             }
@@ -29,6 +31,7 @@ final class CoreRuntime: ObservableObject {
             switch self {
             case .idle: return "DeepSeek Harness внутри приложения"
             case .starting: return "поднимаем DSH в песочнице"
+            case .connecting: return "проверяем связь с движком"
             case .ready: return "127.0.0.1:3080 · локально, без сервера"
             case .failed(let reason): return reason
             }
@@ -144,16 +147,35 @@ final class CoreRuntime: ObservableObject {
         if let data = try? Data(contentsOf: stateFile),
            let info = try? JSONDecoder().decode(EngineInfo.self, from: data) {
             self.info = info
-            phase = .ready
-            Diag.log("engine: готов на \(info.url) за \(Double(attempts) * 0.5) с")
-            // Ключ мог остаться с прошлого запуска — сразу отдаём его ядру,
-            // иначе первый же запрос в чате упрётся в «нет ключа».
-            Task { await ModelStore.shared.syncKeyToEngine() }
+            phase = .connecting
+            Diag.log("engine: адрес получен за \(Double(attempts) * 0.5) с, подключаемся")
+            connect(deadline: Date().addingTimeInterval(8))
             return
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.poll()
+        }
+    }
+
+    /// Рукопожатие с движком: пока оно не прошло, ядро не считается готовым.
+    private func connect(deadline: Date) {
+        Task {
+            do {
+                _ = try await EngineBridge.client()
+                Diag.log("engine: подключились")
+                phase = .ready
+                // Ключ мог остаться с прошлого запуска — сразу отдаём его ядру.
+                await ModelStore.shared.syncKeyToEngine()
+            } catch {
+                if Date() < deadline {
+                    try? await Task.sleep(nanoseconds: 300_000_000)
+                    connect(deadline: deadline)
+                } else {
+                    Diag.log("engine: не удалось подключиться — \(error.localizedDescription)")
+                    phase = .failed("движок поднялся, но не отвечает")
+                }
+            }
         }
     }
 }
