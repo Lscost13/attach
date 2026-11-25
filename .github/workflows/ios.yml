@@ -295,14 +295,16 @@ jobs:
         working-directory: app
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD: ${{ github.run_number }}
         run: |
           mkdir -p site
           cp Attach.ipa manifest.plist manifest.xml site/
-          cat > site/index.html <<'HTML'
+          cat > site/index.html <<HTML
           <!doctype html>
           <html lang="ru"><head><meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Attach</title>
+          <meta http-equiv="Cache-Control" content="no-store">
+          <title>Attach · сборка $BUILD</title>
           <style>
             body { background:#000; color:#fff; font: 17px -apple-system, system-ui, sans-serif;
                    display:flex; min-height:100vh; margin:0; align-items:center; justify-content:center; }
@@ -312,8 +314,8 @@ jobs:
           </style></head>
           <body><div class="card">
             <h1>Attach</h1>
-            <p>Нажми кнопку — iOS предложит установить сборку.</p>
-            <a href="itms-services://?action=download-manifest&amp;url=https://lscost13.github.io/attach/manifest.xml">Установить</a>
+            <p>Сборка $BUILD. Нажми кнопку — iOS предложит установить.</p>
+            <a href="itms-services://?action=download-manifest&amp;url=https://lscost13.github.io/attach/manifest.xml?v=$BUILD">Установить</a>
           </div></body></html>
           HTML
           cd site

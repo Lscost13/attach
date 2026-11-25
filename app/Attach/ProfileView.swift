@@ -16,8 +16,10 @@ struct ProfileView: View {
     @State private var storage: CoreStorage.Report?
     @State private var balance: String?
     @State private var latestBuild: String?
+    @State private var availableBuild: String?
     @State private var showJournal = false
     @State private var crashed = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         NavigationStack {
@@ -242,19 +244,28 @@ struct ProfileView: View {
                 metricRow("данные и сессии", storage?.dataText ?? "…")
                 metricRow("Node", "24.20 · встроен")
                 metricRow("DSH", "0.2.2 · встроен")
+                metricRow("сборка", BuildInfo.number)
                 metricRow("Python", "не подключён")
             }
 
             Divider().overlay(.white.opacity(0.1))
 
             Button {
-                Task { latestBuild = await UpdateChecker.latestCommit() }
+                Task {
+                    latestBuild = await UpdateChecker.latestCommit()
+                    if let release = await UpdateChecker.latestRelease() {
+                        availableBuild = release.number > BuildInfo.numeric ? release.tag : nil
+                    }
+                }
             } label: {
                 HStack {
                     Text("Проверить обновления")
                         .font(.subheadline.weight(.medium))
                     Spacer()
-                    if let latestBuild {
+                    if let availableBuild {
+                        Text("есть \(availableBuild)")
+                            .font(.caption.monospaced())
+                    } else if let latestBuild {
                         Text(latestBuild)
                             .font(.caption.monospaced())
                             .foregroundStyle(.white.opacity(0.5))
@@ -267,6 +278,20 @@ struct ProfileView: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.plain)
+
+            if availableBuild != nil, let page = BuildInfo.installPage {
+                Button {
+                    openURL(page)
+                } label: {
+                    Text("Установить новую сборку")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
 
             Divider().overlay(.white.opacity(0.1))
 

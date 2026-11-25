@@ -57,7 +57,51 @@ enum CoreStorage {
 
 // MARK: - Обновления
 
+/// Какая сборка сейчас установлена.
+enum BuildInfo {
+    static var number: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+    }
+
+    static var numeric: Int {
+        Int(number) ?? 0
+    }
+
+    static var version: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    }
+
+    static var installPage: URL? {
+        URL(string: "https://lscost13.github.io/attach/")
+    }
+}
+
 enum UpdateChecker {
+    struct Release {
+        let tag: String
+        let number: Int
+    }
+
+    /// Последний релиз в репозитории: по номеру видно, свежая ли сборка.
+    static func latestRelease() async -> Release? {
+        guard let url = URL(string: "https://api.github.com/repos/Lscost13/attach/releases/latest") else {
+            return nil
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("Attach/\(BuildInfo.version)", forHTTPHeaderField: "User-Agent")
+
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse,
+              http.statusCode == 200,
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let tag = root["tag_name"] as? String
+        else { return nil }
+
+        let number = Int(tag.replacingOccurrences(of: "build-", with: "")) ?? 0
+        return Release(tag: tag, number: number)
+    }
+
     /// Последний коммит в публичном репозитории — по нему видно, свежая ли сборка.
     static func latestCommit() async -> String? {
         guard let url = URL(string: "https://api.github.com/repos/Lscost13/attach/commits/main") else {

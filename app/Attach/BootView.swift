@@ -42,6 +42,10 @@ struct BootView: View {
                 .animation(.easeInOut(duration: 0.3), value: stage)
 
                 footer
+
+                Text("сборка \(BuildInfo.number)")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.white.opacity(0.22))
             }
             .padding(.horizontal, 40)
             .opacity(revealed ? 1 : 0)
