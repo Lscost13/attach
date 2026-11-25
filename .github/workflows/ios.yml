@@ -304,7 +304,7 @@ jobs:
           cp manifest.plist manifest.xml
 
       - name: Опубликовать IPA
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request'
         working-directory: app
         env:
           GH_TOKEN: ${{ github.token }}
@@ -325,7 +325,7 @@ jobs:
           echo "https://github.com/${{ github.repository }}/releases/download/$tag/Attach.ipa"
 
       - name: Выложить для установки по воздуху
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name != 'pull_request'
         working-directory: app
         env:
           GH_TOKEN: ${{ github.token }}
