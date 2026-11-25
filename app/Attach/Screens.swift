@@ -313,6 +313,8 @@ struct ChatView: View {
     @State private var isSending = false
     @State private var activeSession: String?
     @State private var sendStartedAt: Date?
+    /// Чем агент занят прямо сейчас — «думает», «смотрит файлы», «выполняет команду».
+    @State private var activity = "думает"
 
     var body: some View {
         VStack(spacing: 0) {
@@ -352,9 +354,7 @@ struct ChatView: View {
             }
 
             if isSending {
-                ThinkingBar(startedAt: sendStartedAt) {
-                    stop()
-                }
+                ActivityLine(text: activity)
             }
 
             composer
@@ -392,17 +392,21 @@ struct ChatView: View {
                 .padding(.vertical, 12)
 
             Button {
-                send()
+                if isSending {
+                    stop()
+                } else {
+                    send()
+                }
             } label: {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 17, weight: .semibold))
+                Image(systemName: isSending ? "stop.fill" : "arrow.up")
+                    .font(.system(size: isSending ? 14 : 17, weight: .bold))
                     .foregroundStyle(.black)
                     .frame(width: 40, height: 40)
                     .background(.white, in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .opacity(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
+            .disabled(!isSending && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .opacity(!isSending && draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.4 : 1)
             .padding(.trailing, 8)
         }
         .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 26))
@@ -413,6 +417,34 @@ struct ChatView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(Color.black)
+    }
+
+    /// Что именно делает инструмент — словами, а не именем функции.
+    private func verb(for name: String) -> String {
+        let lower = name.lowercased()
+        if lower.contains("read") || lower.contains("ls") || lower.contains("glob")
+            || lower.contains("list") || lower.contains("open") {
+            return "смотрит файлы"
+        }
+        if lower.contains("grep") || lower.contains("search") || lower.contains("find") {
+            return "ищет"
+        }
+        if lower.contains("write") || lower.contains("edit") || lower.contains("patch")
+            || lower.contains("apply") {
+            return "правит файлы"
+        }
+        if lower.contains("bash") || lower.contains("shell") || lower.contains("exec")
+            || lower.contains("terminal") || lower.contains("command") {
+            return "выполняет команду"
+        }
+        if lower.contains("web") || lower.contains("fetch") || lower.contains("http")
+            || lower.contains("browse") {
+            return "смотрит в интернете"
+        }
+        if lower.contains("question") || lower.contains("ask") {
+            return "спрашивает"
+        }
+        return "вызывает \(name)"
     }
 
     /// Останавливает ход: ядро прекращает работу, очередь сообщений не теряется.
@@ -442,12 +474,24 @@ struct ChatView: View {
         draft = ""
         isSending = true
         sendStartedAt = Date()
+        activity = "думает"
         LiveActivityController.shared.start(chatTitle: chat?.title ?? "Чат")
 
         Task { @MainActor in
             var rendered: [Int: UUID] = [:]
 
             let apply: ([ChatSegment]) -> Void = { segments in
+                if let last = segments.last {
+                    switch last {
+                    case .text:
+                        activity = "пишет ответ"
+                    case .tool(let name, _, let failed):
+                        activity = failed == true ? "спотыкается на \(name)" : verb(for: name)
+                    }
+                } else {
+                    activity = "думает"
+                }
+
                 for (index, segment) in segments.enumerated() {
                     switch segment {
                     case .text(let text):
@@ -669,41 +713,24 @@ struct TasksView: View {
 
 // MARK: - Индикатор работы агента
 
-/// Строка «агент работает»: пульсирующие точки, время и стоп.
-struct ThinkingBar: View {
-    let startedAt: Date?
-    var onStop: () -> Void
+/// Строка «агент работает»: точки и человеческое описание шага.
+struct ActivityLine: View {
+    let text: String
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 10) {
-                ThinkingDots()
+        HStack(spacing: 8) {
+            ThinkingDots()
 
-                Text("DSH работает · \(elapsed(now: context.date)) с")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.55))
-                    .contentTransition(.numericText())
+            Text(text)
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.45))
+                .contentTransition(.opacity)
+                .animation(.easeInOut(duration: 0.2), value: text)
 
-                Spacer(minLength: 0)
-
-                Button(action: onStop) {
-                    Text("Остановить")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.white.opacity(0.08), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 6)
+            Spacer(minLength: 0)
         }
-    }
-
-    private func elapsed(now: Date) -> Int {
-        guard let startedAt else { return 0 }
-        return max(0, Int(now.timeIntervalSince(startedAt)))
+        .padding(.horizontal, 18)
+        .padding(.bottom, 6)
     }
 }
 
