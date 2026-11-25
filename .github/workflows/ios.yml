@@ -93,8 +93,24 @@ jobs:
           if [ "$ok" != "1" ]; then echo "::error::ядро не поднялось"; tail -n 120 /tmp/engine.log; exit 1; fi
           grep "dsh web:" /tmp/engine.log | tail -n 1
 
-      - name: Упаковать движок
+      - name: Изменился ли движок
         if: inputs.engine != 'false'
+        working-directory: app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          HASH=$(sha256sum Engine/package-lock.json | cut -d' ' -f1)
+          echo "ENGINE_HASH=$HASH" >> "$GITHUB_ENV"
+          HAVE=$(gh release view engine-latest --repo "${{ github.repository }}" --json body --jq .body 2>/dev/null | head -n1 || true)
+          if [ "$HAVE" = "$HASH" ]; then
+            echo "движок не менялся — архив не пересобираем"
+            echo "ENGINE_CHANGED=0" >> "$GITHUB_ENV"
+          else
+            echo "ENGINE_CHANGED=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Упаковать движок
+        if: inputs.engine != 'false' && env.ENGINE_CHANGED == '1'
         working-directory: app
         run: |
           rm -f engine.bin
@@ -102,17 +118,27 @@ jobs:
           du -h engine.bin
 
       - name: Опубликовать движок
-        if: inputs.engine != 'false'
+        if: inputs.engine != 'false' && env.ENGINE_CHANGED == '1'
         working-directory: app
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="engine-latest"
-          gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
-          gh release create "$tag" engine.bin \
-            --title "Движок Attach" \
-            --notes "Архив движка DSH для первого запуска. Пересобирается каждой сборкой." \
-            --repo "${{ github.repository }}"
+          for attempt in 1 2 3; do
+            if gh release view "$tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+              gh release delete "$tag" --yes --cleanup-tag --repo "${{ github.repository }}" || true
+            fi
+            if gh release create "$tag" engine.bin \
+                 --title "Движок Attach" \
+                 --notes "$ENGINE_HASH" \
+                 --repo "${{ github.repository }}"; then
+              exit 0
+            fi
+            echo "попытка $attempt не прошла"
+            sleep 20
+          done
+          echo "::error::не удалось опубликовать движок"
+          exit 1
 
       - name: Конфигурация проекта
         working-directory: app
