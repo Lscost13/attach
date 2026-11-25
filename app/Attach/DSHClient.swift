@@ -186,7 +186,87 @@ struct DSHAccount: Equatable {
 
 // MARK: - Разбор истории
 
+/// Один кусок хода: текст модели или вызов инструмента.
+enum ChatSegment: Equatable {
+    case text(String)
+    case tool(name: String, detail: String, failed: Bool?)
+}
+
 enum DSHParse {
+    /// Раскладывает журнал на то, что видно человеку: текст и действия инструментов.
+    static func segments(from records: [[String: Any]]) -> [ChatSegment] {
+        var result: [ChatSegment] = []
+        var callIndex: [String: Int] = [:]
+        var currentText: Int?
+
+        func flush(_ text: String) {
+            guard !text.isEmpty else { return }
+            if let index = currentText, case .text(let existing) = result[index] {
+                result[index] = .text(existing + text)
+            } else {
+                result.append(.text(text))
+                currentText = result.count - 1
+            }
+        }
+
+        for record in records {
+            guard let event = record["event"] as? [String: Any],
+                  let type = event["type"] as? String,
+                  let data = event["data"] as? [String: Any]
+            else { continue }
+
+            if type.hasPrefix("assistant/") {
+                var collected: [String] = []
+                collectText(from: data, into: &collected)
+                flush(collected.joined())
+                continue
+            }
+
+            if type == "tool/call" {
+                // После вызова инструмента текст пойдёт отдельным пузырём.
+                currentText = nil
+                let name = data["name"] as? String ?? "инструмент"
+                result.append(.tool(name: name, detail: argumentSummary(data["arguments"]), failed: nil))
+                if let callId = data["callId"] as? String {
+                    callIndex[callId] = result.count - 1
+                }
+                continue
+            }
+
+            if type == "tool/result" {
+                let message = data["message"] as? [String: Any]
+                let callId = message?["toolCallId"] as? String ?? ""
+                guard let index = callIndex[callId],
+                      index < result.count,
+                      case .tool(let name, let detail, _) = result[index]
+                else { continue }
+                result[index] = .tool(
+                    name: name,
+                    detail: detail,
+                    failed: (message?["isError"] as? Bool) ?? false
+                )
+                continue
+            }
+        }
+
+        return result
+    }
+
+    /// Короткое описание аргументов вызова для карточки в чате.
+    private static func argumentSummary(_ value: Any?) -> String {
+        guard let raw = value as? String, !raw.isEmpty else { return "" }
+        guard let data = raw.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return String(raw.prefix(80)) }
+
+        for key in ["command", "path", "file_path", "pattern", "url", "query", "prompt"] {
+            if let text = object[key] as? String, !text.isEmpty {
+                return String(text.prefix(100))
+            }
+        }
+        return String(raw.prefix(80))
+    }
+
     /// Достаёт из журнала последний ход: текст ассистента и ошибку, если была.
     static func lastTurn(from records: [[String: Any]]) -> DSHReply {
         var reply = DSHReply()

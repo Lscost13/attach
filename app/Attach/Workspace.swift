@@ -4,12 +4,14 @@ import SwiftUI
 // MARK: - Данные
 
 struct ChatMessage: Identifiable, Codable, Hashable {
-    enum Role: String, Codable { case user, assistant }
+    enum Role: String, Codable { case user, assistant, tool }
 
     var id = UUID()
     var role: Role
     var text: String
     var date = Date()
+    /// Инструмент завершился ошибкой — показываем это иначе.
+    var failed: Bool?
 }
 
 struct Chat: Identifiable, Codable, Hashable {
@@ -110,13 +112,22 @@ final class WorkspaceStore: ObservableObject {
     }
 
     /// Обновляет текст сообщения — так ответ проявляется по мере генерации.
-    func updateMessage(_ id: UUID, text: String, in route: ChatRoute, persist: Bool = false) {
+    func updateMessage(
+        _ id: UUID,
+        text: String,
+        failed: Bool? = nil,
+        in route: ChatRoute,
+        persist: Bool = false
+    ) {
         guard let pIndex = projects.firstIndex(where: { $0.id == route.projectID }),
               let cIndex = projects[pIndex].chats.firstIndex(where: { $0.id == route.chatID }),
               let mIndex = projects[pIndex].chats[cIndex].messages.firstIndex(where: { $0.id == id })
         else { return }
 
         projects[pIndex].chats[cIndex].messages[mIndex].text = text
+        if let failed {
+            projects[pIndex].chats[cIndex].messages[mIndex].failed = failed
+        }
         if persist {
             projects[pIndex].chats[cIndex].updatedAt = Date()
             save()
@@ -138,6 +149,11 @@ final class WorkspaceStore: ObservableObject {
     }
 
     // MARK: Диск
+
+    /// Сохранить прямо сейчас — например, когда ход закончился.
+    func saveNow() {
+        save()
+    }
 
     private func load() {
         guard let data = try? Data(contentsOf: fileURL) else { return }

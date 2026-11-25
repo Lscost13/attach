@@ -429,7 +429,34 @@ struct ChatView: View {
         LiveActivityController.shared.start(chatTitle: chat?.title ?? "Чат")
 
         Task { @MainActor in
-            var live: ChatMessage?
+            var rendered: [Int: UUID] = [:]
+
+            func apply(_ segments: [ChatSegment]) {
+                for (index, segment) in segments.enumerated() {
+                    switch segment {
+                    case .text(let text):
+                        if let id = rendered[index] {
+                            store.updateMessage(id, text: text, in: route)
+                        } else {
+                            let message = ChatMessage(role: .assistant, text: text)
+                            store.append(message, to: route)
+                            rendered[index] = message.id
+                        }
+
+                    case .tool(let name, let detail, let failed):
+                        let text = detail.isEmpty ? name : "\(name) · \(detail)"
+                        if let id = rendered[index] {
+                            store.updateMessage(id, text: text, failed: failed, in: route)
+                        } else {
+                            var message = ChatMessage(role: .tool, text: text)
+                            message.failed = failed
+                            store.append(message, to: route)
+                            rendered[index] = message.id
+                        }
+                    }
+                }
+            }
+
             do {
                 guard let info = CoreRuntime.shared.info,
                       let baseURL = URL(string: info.url)
@@ -449,42 +476,28 @@ struct ChatView: View {
                 let before = (try? await client.page(sessionId: sessionId).count) ?? 0
                 try await client.prompt(sessionId: sessionId, text: text)
 
-                // Пузырь появляется сразу и наполняется по мере ответа:
-                // опрос истории каждые полсекунды, а не один раз в конце.
-                let placeholder = ChatMessage(role: .assistant, text: "")
-                live = placeholder
-                store.append(placeholder, to: route)
-
                 var reply = DSHReply()
                 for _ in 0..<240 {
                     try await Task.sleep(nanoseconds: 500_000_000)
                     let records = try await client.page(sessionId: sessionId)
-                    reply = DSHParse.lastTurn(from: Array(records.dropFirst(before)))
-                    if !reply.text.isEmpty {
-                        store.updateMessage(placeholder.id, text: reply.text, in: route)
-                    }
+                    let tail = Array(records.dropFirst(before))
+                    reply = DSHParse.lastTurn(from: tail)
+                    apply(DSHParse.segments(from: tail))
                     if reply.finished { break }
                 }
 
-                let answer: String
                 if let error = reply.error {
-                    answer = "Ошибка: \(error)"
-                } else if !reply.text.isEmpty {
-                    answer = reply.text
+                    store.append(ChatMessage(role: .assistant, text: "Ошибка: \(error)"), to: route)
+                } else if rendered.isEmpty {
+                    store.append(ChatMessage(role: .assistant, text: "Движок не ответил"), to: route)
                 } else {
-                    answer = "Движок не ответил"
+                    store.saveNow()
                 }
-                store.updateMessage(placeholder.id, text: answer, in: route, persist: true)
                 LiveActivityController.shared.finish(
                     status: reply.error == nil ? "готово" : "ошибка"
                 )
             } catch {
-                let text = "Ошибка: \(error.localizedDescription)"
-                if let live {
-                    store.updateMessage(live.id, text: text, in: route, persist: true)
-                } else {
-                    store.append(ChatMessage(role: .assistant, text: text), to: route)
-                }
+                store.append(ChatMessage(role: .assistant, text: "Ошибка: \(error.localizedDescription)"), to: route)
                 LiveActivityController.shared.finish(status: "ошибка")
             }
             isSending = false
@@ -496,25 +509,52 @@ struct MessageBubble: View {
     let message: ChatMessage
 
     var body: some View {
-        HStack {
-            if message.role == .assistant { Spacer(minLength: 40) }
+        if message.role == .tool {
+            toolRow
+        } else {
+            HStack {
+                if message.role == .assistant { Spacer(minLength: 40) }
+
+                Text(message.text)
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        .white.opacity(message.role == .user ? 0.11 : 0.04),
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(.white.opacity(0.1), lineWidth: 1)
+                    )
+
+                if message.role == .user { Spacer(minLength: 40) }
+            }
+        }
+    }
+
+    /// Строка о том, что делает агент: вызов инструмента и его исход.
+    private var toolRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: message.failed == true ? "xmark.circle" : "arrow.turn.down.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(message.failed == true ? 0.75 : 0.4))
 
             Text(message.text)
-                .font(.body)
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    .white.opacity(message.role == .user ? 0.11 : 0.04),
-                    in: RoundedRectangle(cornerRadius: 20)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(.white.opacity(0.1), lineWidth: 1)
-                )
+                .font(.footnote.monospaced())
+                .foregroundStyle(.white.opacity(0.55))
+                .lineLimit(3)
 
-            if message.role == .user { Spacer(minLength: 40) }
+            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(.white.opacity(message.failed == true ? 0.18 : 0.08), lineWidth: 1)
+        )
     }
 }
 
