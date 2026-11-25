@@ -153,12 +153,13 @@ jobs:
 
       - name: Сертификат и профиль
         env:
-          CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
+          CERT_KEY: ${{ secrets.SIGNING_CERT_KEY }}
+          CERT_CRT: ${{ secrets.SIGNING_CERT_CRT }}
           CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
           PROFILE_B64: ${{ secrets.SIGNING_PROFILE }}
         run: |
-          if [ -z "$CERT_P12" ] || [ -z "$PROFILE_B64" ]; then
-            echo "::error::нет секретов подписи (SIGNING_CERT_P12 / SIGNING_PROFILE)"
+          if [ -z "$CERT_KEY" ] || [ -z "$PROFILE_B64" ]; then
+            echo "::error::нет секретов подписи (SIGNING_CERT_KEY / SIGNING_PROFILE)"
             exit 1
           fi
 
@@ -168,7 +169,12 @@ jobs:
           security unlock-keychain -p actions build.keychain
           security list-keychains -d user -s build.keychain $(security list-keychains -d user | tr -d '"')
 
-          printf '%s' "$CERT_P12" | base64 --decode > /tmp/cert.p12
+          # p12 от сторонних утилит macOS не всегда читает, поэтому собираем
+          # его здесь из ключа и сертификата — формат получается свой.
+          printf '%s' "$CERT_KEY" | base64 --decode > /tmp/key.pem
+          printf '%s' "$CERT_CRT" | base64 --decode > /tmp/cert.pem
+          openssl pkcs12 -export -out /tmp/cert.p12 \
+            -inkey /tmp/key.pem -in /tmp/cert.pem -passout "pass:$CERT_PASSWORD"
           security import /tmp/cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain > /dev/null
 
