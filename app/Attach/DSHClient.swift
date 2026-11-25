@@ -96,8 +96,10 @@ final class DSHClient {
 
     // MARK: Методы
 
-    func createSession() async throws -> String {
-        let value = try await rpc("session/create", args: ["request": [:]])
+    func createSession(workspace: String? = nil) async throws -> String {
+        var request: [String: Any] = [:]
+        if let workspace { request["cwd"] = workspace }
+        let value = try await rpc("session/create", args: ["request": request])
         guard let object = value as? [String: Any],
               let id = object["sessionId"] as? String
         else { throw DSHError.badResponse }

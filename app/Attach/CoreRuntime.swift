@@ -40,6 +40,14 @@ final class CoreRuntime: ObservableObject {
 
     static let shared = CoreRuntime()
 
+    /// Папка, в которой работает агент: чистая, без движка и мусора.
+    static var workDirectory: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let dir = docs.appendingPathComponent("work", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var info: EngineInfo?
 
@@ -80,8 +88,7 @@ final class CoreRuntime: ObservableObject {
         let home = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         // DSH считает рабочим каталогом текущую папку: пусть это будет пустая
         // папка, а не Documents, где лежит весь движок из 70 тысяч файлов.
-        let work = home.appendingPathComponent("work", isDirectory: true)
-        try? FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        let work = Self.workDirectory
 
         setenv("HOME", home.path, 1)
         setenv("ATTACH_ENGINE", engine.path, 1)

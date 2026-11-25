@@ -500,7 +500,9 @@ struct ChatView: View {
                 if let existing = store.engineSession(route) {
                     sessionId = existing
                 } else {
-                    sessionId = try await client.createSession()
+                    sessionId = try await client.createSession(
+                        workspace: CoreRuntime.workDirectory.path
+                    )
                     store.setEngineSession(sessionId, for: route)
                 }
                 activeSession = sessionId
