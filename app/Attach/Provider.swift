@@ -62,6 +62,15 @@ enum ProviderKind: String, CaseIterable, Codable, Identifiable {
         }
     }
 
+    /// Под каким именем движок ищет ключ этого провайдера.
+    /// Пока ядро умеет только DeepSeek: остальные маршруты в нём не настроены.
+    var credentialRef: String? {
+        switch self {
+        case .deepseek: return "DEEPSEEK_API_KEY"
+        default: return nil
+        }
+    }
+
     /// Куда отправить человека, если ключа ещё нет.
     var consoleURL: URL? {
         switch self {

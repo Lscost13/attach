@@ -2,6 +2,9 @@ import Foundation
 
 @MainActor
 final class ModelStore: ObservableObject {
+    /// Один на всё приложение: ядру тоже нужен доступ к ключу.
+    static let shared = ModelStore()
+
     enum CheckState: Equatable {
         case idle
         case checking
@@ -51,6 +54,35 @@ final class ModelStore: ObservableObject {
         defaults.set(model, forKey: "model")
         defaults.set(baseURL, forKey: "baseURL")
         hasKey = currentKey != nil
+
+        // Ключ нужен не только приложению: без него движок не может ходить в DeepSeek.
+        Task { await syncKeyToEngine() }
+    }
+
+    /// Отдаёт ключ ядру через его хранилище секретов.
+    func syncKeyToEngine() async {
+        guard let key = currentKey else {
+            Diag.log("key: ключа нет, передавать нечего")
+            return
+        }
+        guard let ref = provider.credentialRef else {
+            Diag.log("key: для \(provider.rawValue) передача в ядро пока не сделана")
+            return
+        }
+
+        do {
+            try await EngineBridge.store(key: key, ref: ref)
+            Diag.log("key: \(ref) передан ядру")
+            check = .ok("ключ передан ядру")
+        } catch {
+            if CoreRuntime.shared.info == nil {
+                // Ядро ещё поднимается — отдадим ключ, когда оно ответит.
+                Diag.log("key: ядро не готово, передадим при старте")
+            } else {
+                Diag.log("key: не удалось передать — \(error.localizedDescription)")
+                check = .failed("ядро не приняло ключ: \(error.localizedDescription)")
+            }
+        }
     }
 
     func removeKey() {

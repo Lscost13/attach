@@ -132,6 +132,9 @@ final class CoreRuntime: ObservableObject {
             self.info = info
             phase = .ready
             Diag.log("engine: готов на \(info.url) за \(Double(attempts) * 0.5) с")
+            // Ключ мог остаться с прошлого запуска — сразу отдаём его ядру,
+            // иначе первый же запрос в чате упрётся в «нет ключа».
+            Task { await ModelStore.shared.syncKeyToEngine() }
             return
         }
 

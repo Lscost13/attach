@@ -167,6 +167,8 @@ final class EngineInstaller: ObservableObject {
 
         if isReady {
             phase = .ready
+            // Ядро поднимаем сразу при запуске, не дожидаясь действий пользователя.
+            CoreRuntime.shared.bootIfNeeded()
             return
         }
 

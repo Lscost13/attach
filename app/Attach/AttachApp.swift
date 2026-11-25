@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct AttachApp: App {
     @StateObject private var store = WorkspaceStore()
-    @StateObject private var models = ModelStore()
+    @StateObject private var models = ModelStore.shared
 
     init() {
         Diag.install()

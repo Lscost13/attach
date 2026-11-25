@@ -329,12 +329,7 @@ struct ProfileView: View {
     // MARK: Вход в DeepSeek
 
     private func makeClient() async throws -> DSHClient {
-        guard let info = CoreRuntime.shared.info,
-              let base = URL(string: info.url)
-        else { throw DSHError.engine("ядро не запущено") }
-        let client = DSHClient(base: base)
-        try await client.handshake(token: info.token ?? "")
-        return client
+        try await EngineBridge.client()
     }
 
     private func loadAccount() async -> DSHAccount? {
