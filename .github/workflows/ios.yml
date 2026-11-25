@@ -279,7 +279,7 @@ jobs:
                     <key>kind</key>
                     <string>software-package</string>
                     <key>url</key>
-                    <string>https://github.com/${{ github.repository }}/releases/download/build-$BUILD/Attach.ipa</string>
+                    <string>https://lscost13.github.io/attach/Attach.ipa</string>
                   </dict>
                 </array>
                 <key>metadata</key>
@@ -305,6 +305,7 @@ jobs:
 
       - name: Опубликовать IPA
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         working-directory: app
         env:
           GH_TOKEN: ${{ github.token }}
